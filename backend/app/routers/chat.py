@@ -1,21 +1,36 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.orm import Session
+from app.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
-import uuid
+from app.services.honeypot_agent import process_honeypot_chat
 
 router = APIRouter(prefix="/api", tags=["Honeypot Chat"])
 
 @router.post("/chat", response_model=ChatResponse)
-def chat_honeypot(payload: ChatRequest):
+def chat_honeypot(payload: ChatRequest, db: Session = Depends(get_db)):
     """
     POST /api/chat
     Simulated honeypot persona response generation.
+    Engages scammers safely in a controlled environment to coax operational intel without real interaction.
     """
-    session_id = payload.session_id or f"TF-{uuid.uuid4().hex[:6].upper()}"
+    if not payload.message or not payload.message.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Message payload must not be empty or whitespace-only."
+        )
+
+    session, reply, tactics, iocs = process_honeypot_chat(
+        db=db,
+        message=payload.message,
+        session_id=payload.session_id,
+        persona=payload.persona or "victim"
+    )
+
     return ChatResponse(
-        session_id=session_id,
-        reply="Placeholder honeypot agent response.",
-        persona=payload.persona or "victim",
-        tactics_detected=[],
-        extracted_iocs=[],
-        turn_count=1
+        session_id=session.id,
+        reply=reply,
+        persona=session.persona,
+        tactics_detected=tactics,
+        extracted_iocs=iocs,
+        turn_count=session.turn_count
     )
