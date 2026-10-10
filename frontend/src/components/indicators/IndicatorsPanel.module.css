@@ -1,0 +1,83 @@
+.panel {
+  background: linear-gradient(145deg, #111b2a, #0c1220);
+  border: 1px solid var(--border, #1e2d42);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h3 {
+  margin: 0;
+  font: 600 16px 'Space Grotesk', sans-serif;
+  color: #eaf0f9;
+  letter-spacing: -.2px;
+}
+
+.badge {
+  background: rgba(125,245,106,.08);
+  color: #7df56a;
+  border: 1px solid rgba(125,245,106,.15);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.emptyState {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 20px;
+  min-height: 200px;
+  color: #8b9bb5;
+  font-size: 14px;
+}
+
+.emptyState p {
+  margin: 14px 0 0;
+  font-weight: 500;
+}
+
+.disclaimer {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #5f7190;
+}
+
+.idleIcon, .safeIcon, .errorIcon {
+  font-size: 36px;
+  display: block;
+  opacity: .7;
+}
+
+.errorIcon { color: #ff6b7a; }
+.safeIcon { color: #7df56a; }
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(30,45,66,.6);
+  border-top-color: #7df56a;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
