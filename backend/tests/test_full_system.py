@@ -8,7 +8,8 @@ def test_full_system_workflow():
     # 1. Check Health Endpoint
     health_res = client.get("/health")
     assert health_res.status_code == 200
-    assert health_res.json() == {"status": "ok"}
+    assert health_res.json()["status"] == "ok"
+    assert "model_loaded" in health_res.json()
 
     # 2. Analyze a suspicious scam message
     scam_msg = (
@@ -18,8 +19,8 @@ def test_full_system_workflow():
     analyze_res = client.post("/api/analyze", json={"message": scam_msg})
     assert analyze_res.status_code == 200
     analysis_data = analyze_res.json()
-    assert analysis_data["risk_score"] >= 80.0
-    assert analysis_data["risk_level"] == "CRITICAL"
+    assert analysis_data["risk_score"] >= 80
+    assert analysis_data["risk_level"] == "critical"
     assert len(analysis_data["indicators"]) >= 2
 
     # 3. Engage scammer in honeypot chat

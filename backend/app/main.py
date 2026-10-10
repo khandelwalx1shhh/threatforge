@@ -140,4 +140,8 @@ app.include_router(dashboard.router)
 
 @app.get("/health", tags=["Health"])
 def health_check():
-    return {"status": "ok"}
+    from app.services.model_manager import model_manager
+    return {
+        "status": "ok",
+        "model_loaded": model_manager.is_loaded
+    }

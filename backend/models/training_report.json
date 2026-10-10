@@ -1,0 +1,41 @@
+{
+  "model_version": "text-v1",
+  "raw_samples_found": 81,
+  "deduplicated_samples": 25,
+  "labeled_supervised_samples": 19,
+  "class_distribution": {
+    "benign": 13,
+    "scam": 6
+  },
+  "classifier_algorithm": "MultinomialNB",
+  "pipeline": "TfidfVectorizer(ngram_range=(1,2)) + MultinomialNB",
+  "random_seed": 42,
+  "split_details": {
+    "train_count": 14,
+    "test_count": 5,
+    "test_ratio": 0.25
+  },
+  "evaluation_metrics": {
+    "weighted_precision": 0.36,
+    "weighted_recall": 0.6,
+    "weighted_f1": 0.45,
+    "confusion_matrix": {
+      "labels": [
+        "benign",
+        "scam"
+      ],
+      "matrix": [
+        [
+          3,
+          0
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    }
+  },
+  "status": "SUCCESS",
+  "model_path": "models/scam_classifier_v1.joblib"
+}

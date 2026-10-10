@@ -6,7 +6,9 @@ client = TestClient(app)
 def test_health_endpoint():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "model_loaded" in data
 
 def test_analyze_endpoint_placeholder():
     payload = {"message": "Urgent! Transfer funds to account 123456 immediately"}

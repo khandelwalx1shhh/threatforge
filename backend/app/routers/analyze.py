@@ -4,7 +4,6 @@ from app.database import get_db
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
 from app.services.analyzer import analyze_scam_risk
 from app.models import AnalysisReport, ThreatLog
-from json import dumps
 
 router = APIRouter(prefix="/api", tags=["Threat Analysis"])
 
@@ -12,26 +11,33 @@ router = APIRouter(prefix="/api", tags=["Threat Analysis"])
 def analyze_threat(payload: AnalyzeRequest, db: Session = Depends(get_db)):
     """
     POST /api/analyze
-    Analyzes suspicious text/message for scam risk scoring and explainable breakdown.
+    Analyzes suspicious text/message for scam risk scoring, reasons, and recommended action.
+    Combines trained ML classifier and explainable deterministic rules.
     Persists analysis report and logs extracted threat indicators into database.
     """
-    if not payload.message or not payload.message.strip():
+    text_to_analyze = payload.text or payload.message
+    if not text_to_analyze or not text_to_analyze.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Message payload must not be empty or whitespace-only."
+            detail="Message text must not be empty or whitespace-only."
         )
 
-    result = analyze_scam_risk(message=payload.message, sender=payload.sender)
-
-    # Persist report
-    report = AnalysisReport(
-        message=payload.message,
+    result = analyze_scam_risk(
+        message=text_to_analyze,
         sender=payload.sender,
-        risk_score=result.risk_score,
-        risk_level=result.risk_level.value,
-        summary=result.summary,
-        breakdown_json=[f.model_dump() for f in result.breakdown],
-        recommendations_json=result.recommendations
+        source=payload.source,
+        cloud_analysis=payload.cloud_analysis
+    )
+
+    # Persist report to database
+    report = AnalysisReport(
+        message=text_to_analyze,
+        sender=payload.sender,
+        risk_score=float(result.risk_score),
+        risk_level=result.risk_level,
+        summary=result.summary or f"{result.risk_level.upper()} RISK ({result.risk_score}/100)",
+        breakdown_json=[f.model_dump() for f in (result.breakdown or [])],
+        recommendations_json=result.recommendations or [result.recommended_action]
     )
     db.add(report)
 
@@ -47,8 +53,8 @@ def analyze_threat(payload: AnalyzeRequest, db: Session = Depends(get_db)):
                 value=ioc.value,
                 severity=ioc.severity.value,
                 confidence=ioc.confidence,
-                risk_score=result.risk_score,
-                source="Threat Analysis",
+                risk_score=float(result.risk_score),
+                source=f"Analysis ({payload.source or 'manual_test'})",
                 context=ioc.context,
                 metadata_json=ioc.metadata or {}
             )

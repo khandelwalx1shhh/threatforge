@@ -6,4 +6,7 @@ client = TestClient(app)
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "model_loaded" in data
+    assert isinstance(data["model_loaded"], bool)
