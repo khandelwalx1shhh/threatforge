@@ -6,11 +6,17 @@ import android.service.notification.StatusBarNotification
 import com.threatforge.android.ThreatForgeApplication
 import com.threatforge.android.filter.PackageFilter
 import com.threatforge.android.model.NotificationEvent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class ThreatForgeNotificationListenerService : NotificationListenerService() {
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -55,8 +61,10 @@ class ThreatForgeNotificationListenerService : NotificationListenerService() {
             isSynthetic = false
         )
 
-        // Route to shared downstream processing pipeline
-        ThreatForgeApplication.pipeline.processEvent(event)
+        // Route to shared downstream processing pipeline asynchronously
+        serviceScope.launch {
+            ThreatForgeApplication.pipeline.processEvent(event)
+        }
     }
 
     companion object {

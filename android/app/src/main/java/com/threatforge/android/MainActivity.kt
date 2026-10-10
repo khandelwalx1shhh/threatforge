@@ -1,6 +1,5 @@
 package com.threatforge.android
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -31,7 +30,9 @@ import com.threatforge.android.model.AnalysisSource
 import com.threatforge.android.model.NotificationEvent
 import com.threatforge.android.model.RiskAnalysisResult
 import com.threatforge.android.model.RiskLevel
+import com.threatforge.android.network.ThreatForgeApiClient
 import com.threatforge.android.service.ThreatForgeNotificationListenerService
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -78,18 +79,24 @@ fun ThreatForgeTheme(content: @Composable () -> Unit) {
 @Composable
 fun ThreatForgeApp() {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val pipeline = ThreatForgeApplication.pipeline
 
     val alerts by pipeline.alerts.collectAsState()
     val ignoredCount by pipeline.ignoredCount.collectAsState()
     val dedupedCount by pipeline.dedupedCount.collectAsState()
+    val isLoading by pipeline.isLoading.collectAsState()
+    val statusMessage by pipeline.statusMessage.collectAsState()
     val isServiceConnected by ThreatForgeNotificationListenerService.isConnected.collectAsState()
 
     var isPermissionGranted by remember { mutableStateOf(isNotificationAccessGranted(context)) }
+    var cloudAnalysisEnabled by remember { mutableStateOf(pipeline.cloudAnalysisEnabled.value) }
+    var userConsentGranted by remember { mutableStateOf(pipeline.userConsentGranted.value) }
+    var currentBaseUrl by remember { mutableStateOf(pipeline.apiClient.baseUrl) }
+
     var customInput by remember { mutableStateOf("") }
     var selectedPackage by remember { mutableStateOf(PackageFilter.PACKAGE_WHATSAPP) }
 
-    // Periodically refresh permission check when screen is visible
     DisposableEffect(Unit) {
         isPermissionGranted = isNotificationAccessGranted(context)
         onDispose { }
@@ -115,8 +122,8 @@ fun ThreatForgeApp() {
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Screening Engine",
-                            fontSize = 13.sp,
+                            if (cloudAnalysisEnabled && userConsentGranted) "Cloud + Local" else "Local Only",
+                            fontSize = 12.sp,
                             color = Color(0xFF94A3B8)
                         )
                     }
@@ -134,15 +141,30 @@ fun ThreatForgeApp() {
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
+            item { Spacer(modifier = Modifier.height(2.dp)) }
 
-            // 1. Permission & Privacy Card
+            // 1. Mandatory Privacy & Cloud Consent Panel
             item {
-                PermissionStatusCard(
-                    isGranted = isPermissionGranted,
+                PrivacyAndConsentCard(
+                    isPermissionGranted = isPermissionGranted,
                     isConnected = isServiceConnected,
+                    cloudEnabled = cloudAnalysisEnabled,
+                    onCloudToggled = {
+                        cloudAnalysisEnabled = it
+                        pipeline.cloudAnalysisEnabled.value = it
+                    },
+                    consentGranted = userConsentGranted,
+                    onConsentToggled = {
+                        userConsentGranted = it
+                        pipeline.userConsentGranted.value = it
+                    },
+                    baseUrl = currentBaseUrl,
+                    onBaseUrlChanged = {
+                        currentBaseUrl = it
+                        pipeline.apiClient.baseUrl = it
+                    },
                     onOpenSettings = {
                         openNotificationSettings(context)
                         isPermissionGranted = isNotificationAccessGranted(context)
@@ -150,7 +172,14 @@ fun ThreatForgeApp() {
                 )
             }
 
-            // 2. Metrics & Telemetry Bar
+            // 2. Loading & Status Banner
+            if (isLoading || statusMessage != null) {
+                item {
+                    StatusBanner(isLoading = isLoading, message = statusMessage)
+                }
+            }
+
+            // 3. Metrics Bar
             item {
                 MetricsBar(
                     alertCount = alerts.size,
@@ -160,58 +189,69 @@ fun ThreatForgeApp() {
                 )
             }
 
-            // 3. Synthetic Test Suite Card
+            // 4. Synthetic Verification Harness (Task D: 4 sample categories)
             item {
                 SyntheticTestCard(
-                    onRunSuspiciousTest = {
-                        pipeline.processEvent(
-                            NotificationEvent(
-                                packageName = PackageFilter.PACKAGE_WHATSAPP,
-                                title = "WhatsApp Security Alert",
-                                text = "URGENT: Your example.com account will be suspended. Share your OTP immediately to prevent the suspension.",
-                                isSynthetic = true
+                    isLoading = isLoading,
+                    onRunScamTest = {
+                        coroutineScope.launch {
+                            pipeline.processEvent(
+                                NotificationEvent(
+                                    packageName = PackageFilter.PACKAGE_WHATSAPP,
+                                    title = "WhatsApp Security Alert",
+                                    text = "URGENT: Your example.com account will be suspended. Share your OTP immediately to prevent suspension.",
+                                    isSynthetic = true
+                                )
                             )
-                        )
+                        }
                     },
                     onRunBenignTest = {
-                        pipeline.processEvent(
-                            NotificationEvent(
+                        coroutineScope.launch {
+                            pipeline.processEvent(
+                                NotificationEvent(
+                                    packageName = PackageFilter.PACKAGE_WHATSAPP,
+                                    title = "Appointment Reminder",
+                                    text = "Your appointment is confirmed for tomorrow at 10 AM. Thank you.",
+                                    isSynthetic = true
+                                )
+                            )
+                        }
+                    },
+                    onRunUrlTest = {
+                        coroutineScope.launch {
+                            pipeline.processEvent(
+                                NotificationEvent(
+                                    packageName = PackageFilter.PACKAGE_TELEGRAM,
+                                    title = "Security Verification",
+                                    text = "Please check your account status at https://example.com/account-review",
+                                    isSynthetic = true
+                                )
+                            )
+                        }
+                    },
+                    onRunFilterTest = {
+                        coroutineScope.launch {
+                            pipeline.processEvent(
+                                NotificationEvent(
+                                    packageName = "com.google.android.gm",
+                                    title = "Newsletter Notice",
+                                    text = "URGENT: Verify your account now or it will be suspended",
+                                    isSynthetic = true
+                                )
+                            )
+                        }
+                    },
+                    onRunDedupTest = {
+                        coroutineScope.launch {
+                            val event = NotificationEvent(
                                 packageName = PackageFilter.PACKAGE_WHATSAPP,
-                                title = "Appointment Reminder",
-                                text = "Your appointment is confirmed for tomorrow at 10 AM. Thank you.",
+                                title = "Urgent Notice",
+                                text = "Your account will be suspended. Share your OTP immediately.",
                                 isSynthetic = true
                             )
-                        )
-                    },
-                    onRunUnrelatedPackageTest = {
-                        pipeline.processEvent(
-                            NotificationEvent(
-                                packageName = "com.google.android.gm",
-                                title = "Newsletter",
-                                text = "URGENT: Don't miss out on our deals",
-                                isSynthetic = true
-                            )
-                        )
-                    },
-                    onRunMalformedTest = {
-                        pipeline.processEvent(
-                            NotificationEvent(
-                                packageName = PackageFilter.PACKAGE_WHATSAPP,
-                                title = "",
-                                text = "",
-                                isSynthetic = true
-                            )
-                        )
-                    },
-                    onRunDuplicateTest = {
-                        val duplicateSample = NotificationEvent(
-                            packageName = PackageFilter.PACKAGE_TELEGRAM,
-                            title = "Telegram Support",
-                            text = "URGENT: Your account will be blocked. Share your OTP to verify.",
-                            isSynthetic = true
-                        )
-                        pipeline.processEvent(duplicateSample)
-                        pipeline.processEvent(duplicateSample)
+                            pipeline.processEvent(event)
+                            pipeline.processEvent(event)
+                        }
                     },
                     customInput = customInput,
                     onCustomInputChange = { customInput = it },
@@ -219,21 +259,24 @@ fun ThreatForgeApp() {
                     onPackageSelected = { selectedPackage = it },
                     onSubmitCustom = {
                         if (customInput.isNotBlank()) {
-                            pipeline.processEvent(
-                                NotificationEvent(
-                                    packageName = selectedPackage,
-                                    title = "Message Preview",
-                                    text = customInput,
-                                    isSynthetic = true
-                                )
-                            )
+                            val textToSubmit = customInput
                             customInput = ""
+                            coroutineScope.launch {
+                                pipeline.processEvent(
+                                    NotificationEvent(
+                                        packageName = selectedPackage,
+                                        title = "Message Input",
+                                        text = textToSubmit,
+                                        isSynthetic = true
+                                    )
+                                )
+                            }
                         }
                     }
                 )
             }
 
-            // 4. Alerts Stream Header
+            // 5. Alerts Stream Header
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -243,18 +286,16 @@ fun ThreatForgeApp() {
                     Text(
                         "LIVE WARNING STREAM (${alerts.size})",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         letterSpacing = 1.sp,
                         color = Color(0xFF94A3B8)
                     )
                 }
             }
 
-            // Empty State
+            // Alerts list or empty state
             if (alerts.isEmpty()) {
-                item {
-                    EmptyAlertsCard()
-                }
+                item { EmptyAlertsCard() }
             } else {
                 items(alerts, key = { it.eventKey + it.timestamp }) { alert ->
                     WarningCard(alert)
@@ -267,9 +308,15 @@ fun ThreatForgeApp() {
 }
 
 @Composable
-fun PermissionStatusCard(
-    isGranted: Boolean,
+fun PrivacyAndConsentCard(
+    isPermissionGranted: Boolean,
     isConnected: Boolean,
+    cloudEnabled: Boolean,
+    onCloudToggled: (Boolean) -> Unit,
+    consentGranted: Boolean,
+    onConsentToggled: (Boolean) -> Unit,
+    baseUrl: String,
+    onBaseUrlChanged: (String) -> Unit,
     onOpenSettings: () -> Unit
 ) {
     Card(
@@ -277,53 +324,146 @@ fun PermissionStatusCard(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF131D31)),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "NOTIFICATION MONITORING",
-                    fontSize = 12.sp,
+                    "PRIVACY & CLOUD CONSENT",
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF38BDF8),
                     letterSpacing = 1.sp
                 )
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = if (isConnected || isGranted) Color(0x2010B981) else Color(0x20F59E0B)
+                    color = if (isConnected || isPermissionGranted) Color(0x2010B981) else Color(0x20F59E0B)
                 ) {
                     Text(
-                        if (isConnected) "CONNECTED" else if (isGranted) "AUTHORIZED" else "ACCESS REQUIRED",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        fontSize = 11.sp,
+                        if (isConnected) "LISTENER CONNECTED" else if (isPermissionGranted) "AUTHORIZED" else "ACCESS REQUIRED",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isConnected || isGranted) Color(0xFF10B981) else Color(0xFFF59E0B)
+                        color = if (isConnected || isPermissionGranted) Color(0xFF10B981) else Color(0xFFF59E0B)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                "THREATFORGE screens permitted messaging apps (WhatsApp and Telegram) directly on your device. Only notification text from permitted apps is processed locally. Unrelated notifications are instantly discarded.",
-                fontSize = 12.sp,
-                color = Color(0xFFCBD5E1),
-                lineHeight = 17.sp
-            )
+            // Mandatory Privacy Notice Quote
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFF0F172A),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Android notification access is broad at the operating-system level. THREATFORGE filters notification events inside the app and processes only supported sources: WhatsApp (com.whatsapp) and Telegram (org.telegram.messenger). Notification previews may be incomplete, so the app may not receive the full message. Automated risk results are assessments, not proof of malicious intent or guilt.",
+                    fontSize = 11.sp,
+                    color = Color(0xFFCBD5E1),
+                    lineHeight = 16.sp,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
 
-            if (!isGranted) {
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Cloud Analysis Toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Enable Cloud Analysis (POST /api/analyze)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text("Queries backend ML & threat intelligence", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                }
+                Switch(checked = cloudEnabled, onCheckedChange = onCloudToggled)
+            }
+
+            // User Consent Checkbox
+            if (cloudEnabled) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = consentGranted, onCheckedChange = onConsentToggled)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "I consent to sending eligible notification text to the configured backend for threat analysis.",
+                        fontSize = 11.sp,
+                        color = if (consentGranted) Color(0xFF38BDF8) else Color(0xFFFCA5A5)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Endpoint configuration
+                Text("Backend Host: $baseUrl", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF94A3B8))
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = baseUrl == ThreatForgeApiClient.USB_REVERSE_BASE_URL,
+                        onClick = { onBaseUrlChanged(ThreatForgeApiClient.USB_REVERSE_BASE_URL) },
+                        label = { Text("USB/ADB", fontSize = 10.sp) }
+                    )
+                    FilterChip(
+                        selected = baseUrl == ThreatForgeApiClient.LAN_WIFI_BASE_URL,
+                        onClick = { onBaseUrlChanged(ThreatForgeApiClient.LAN_WIFI_BASE_URL) },
+                        label = { Text("LAN Wi-Fi", fontSize = 10.sp) }
+                    )
+                    FilterChip(
+                        selected = baseUrl == ThreatForgeApiClient.EMULATOR_BASE_URL,
+                        onClick = { onBaseUrlChanged(ThreatForgeApiClient.EMULATOR_BASE_URL) },
+                        label = { Text("Emulator", fontSize = 10.sp) }
+                    )
+                }
+            }
+
+            if (!isPermissionGranted) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = onOpenSettings,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Grant Notification Listener Permission", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Grant Notification Listener Permission", fontSize = 12.sp)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun StatusBanner(isLoading: Boolean, message: String?) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = if (isLoading) Color(0x3038BDF8) else Color(0x20F59E0B)
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = Color(0xFF38BDF8)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+            Text(
+                text = message ?: "Processing...",
+                fontSize = 11.sp,
+                color = if (isLoading) Color(0xFFE0F2FE) else Color(0xFFFDE68A),
+                lineHeight = 15.sp
+            )
         }
     }
 }
@@ -348,7 +488,7 @@ fun MetricsBar(
             shape = RoundedCornerShape(8.dp),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            Text("Clear", fontSize = 12.sp, color = Color(0xFF94A3B8))
+            Text("Clear", fontSize = 11.sp, color = Color(0xFF94A3B8))
         }
     }
 }
@@ -361,22 +501,23 @@ fun MetricItem(label: String, value: String, modifier: Modifier = Modifier) {
         color = Color(0xFF1E293B)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF8FAFC))
-            Text(label, fontSize = 11.sp, color = Color(0xFF94A3B8))
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF8FAFC))
+            Text(label, fontSize = 10.sp, color = Color(0xFF94A3B8))
         }
     }
 }
 
 @Composable
 fun SyntheticTestCard(
-    onRunSuspiciousTest: () -> Unit,
+    isLoading: Boolean,
+    onRunScamTest: () -> Unit,
     onRunBenignTest: () -> Unit,
-    onRunUnrelatedPackageTest: () -> Unit,
-    onRunMalformedTest: () -> Unit,
-    onRunDuplicateTest: () -> Unit,
+    onRunUrlTest: () -> Unit,
+    onRunFilterTest: () -> Unit,
+    onRunDedupTest: () -> Unit,
     customInput: String,
     onCustomInputChange: (String) -> Unit,
     selectedPackage: String,
@@ -388,77 +529,82 @@ fun SyntheticTestCard(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF161F30)),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "SYNTHETIC VERIFICATION HARNESS",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFA855F7),
-                    letterSpacing = 1.sp
-                )
-            }
+        Column(modifier = Modifier.padding(14.dp)) {
             Text(
-                "Simulates notification events through the exact same downstream processing pipeline.",
+                "SYNTHETIC VERIFICATION HARNESS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFA855F7),
+                letterSpacing = 1.sp
+            )
+            Text(
+                "Dispatches synthetic events into the exact same pipeline and API client.",
                 fontSize = 11.sp,
                 color = Color(0xFF94A3B8)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Presets grid
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Primary Test Row
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Button(
-                    onClick = onRunSuspiciousTest,
+                    onClick = onRunScamTest,
+                    enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("1. Scam Test", fontSize = 12.sp)
+                    Text("1. Scam Test", fontSize = 11.sp)
                 }
                 Button(
                     onClick = onRunBenignTest,
+                    enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("2. Benign Test", fontSize = 12.sp)
+                    Text("2. Benign Test", fontSize = 11.sp)
+                }
+                Button(
+                    onClick = onRunUrlTest,
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("3. URL Test", fontSize = 11.sp)
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Secondary Filter & Dedup tests
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(
-                    onClick = onRunUnrelatedPackageTest,
+                    onClick = onRunFilterTest,
+                    enabled = !isLoading,
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("3. Filter Test", fontSize = 11.sp, color = Color(0xFFE2E8F0))
+                    Text("Filter Test", fontSize = 10.sp, color = Color(0xFFCBD5E1))
                 }
                 OutlinedButton(
-                    onClick = onRunMalformedTest,
+                    onClick = onRunDedupTest,
+                    enabled = !isLoading,
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("4. Empty Test", fontSize = 11.sp, color = Color(0xFFE2E8F0))
-                }
-                OutlinedButton(
-                    onClick = onRunDuplicateTest,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("5. Dedup Test", fontSize = 11.sp, color = Color(0xFFE2E8F0))
+                    Text("Dedup Test", fontSize = 10.sp, color = Color(0xFFCBD5E1))
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Custom input
             OutlinedTextField(
                 value = customInput,
                 onValueChange = onCustomInputChange,
-                placeholder = { Text("Or enter custom notification message to test...", fontSize = 12.sp) },
+                placeholder = { Text("Or type custom notification text to screen...", fontSize = 11.sp) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 maxLines = 3
@@ -476,21 +622,22 @@ fun SyntheticTestCard(
                         selected = selectedPackage == PackageFilter.PACKAGE_WHATSAPP,
                         onClick = { onPackageSelected(PackageFilter.PACKAGE_WHATSAPP) }
                     )
-                    Text("WhatsApp", fontSize = 12.sp, color = Color(0xFFCBD5E1))
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("WhatsApp", fontSize = 11.sp, color = Color(0xFFCBD5E1))
+                    Spacer(modifier = Modifier.width(6.dp))
                     RadioButton(
                         selected = selectedPackage == PackageFilter.PACKAGE_TELEGRAM,
                         onClick = { onPackageSelected(PackageFilter.PACKAGE_TELEGRAM) }
                     )
-                    Text("Telegram", fontSize = 12.sp, color = Color(0xFFCBD5E1))
+                    Text("Telegram", fontSize = 11.sp, color = Color(0xFFCBD5E1))
                 }
 
                 Button(
                     onClick = onSubmitCustom,
+                    enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Analyze", fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                    Text("Screen", fontSize = 11.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -508,7 +655,7 @@ fun WarningCard(alert: RiskAnalysisResult) {
 
     val sourceLabel = when (alert.analysisSource) {
         AnalysisSource.LOCAL_HEURISTIC -> "Local heuristic analysis"
-        AnalysisSource.BACKEND_ANALYSIS -> "Backend API analysis"
+        AnalysisSource.BACKEND_ANALYSIS -> "Backend API analysis (POST /api/analyze)"
     }
 
     val formattedTime = remember(alert.timestamp) {
@@ -522,8 +669,8 @@ fun WarningCard(alert: RiskAnalysisResult) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF131B2B)),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header Row: Level + Score + Synthetic Badge
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header Row: Level + Score + Synthetic Badge + Time
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -536,10 +683,10 @@ fun WarningCard(alert: RiskAnalysisResult) {
                     ) {
                         Text(
                             text = alert.level.name,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                             color = levelColor,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            fontSize = 11.sp
                         )
                     }
 
@@ -563,36 +710,47 @@ fun WarningCard(alert: RiskAnalysisResult) {
                             Text(
                                 "SYNTHETIC TEST",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                fontSize = 10.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFD8B4FE)
                             )
                         }
                     }
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(formattedTime, fontSize = 11.sp, color = Color(0xFF64748B))
+                    Text(formattedTime, fontSize = 10.sp, color = Color(0xFF64748B))
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Package / Origin info
+            // Origin / Package
             alert.packageName?.let { pkg ->
                 Text(
-                    text = "App: ${pkg.substringAfterLast('.')}",
+                    text = "App Source: ${pkg.substringAfterLast('.')}",
                     fontSize = 11.sp,
                     color = Color(0xFF94A3B8),
                     fontFamily = FontFamily.Monospace
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Summary if available
+            alert.summary?.let { summary ->
+                Text(
+                    text = summary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFE2E8F0)
+                )
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
-            // Reasons
+            // Reasons / Breakdown Factors
             Text(
                 "Triggered Indicators & Explainable Reasons:",
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFE2E8F0)
+                color = Color(0xFFCBD5E1)
             )
             alert.reasons.forEach { reason ->
                 Row(
@@ -600,12 +758,23 @@ fun WarningCard(alert: RiskAnalysisResult) {
                         .fillMaxWidth()
                         .padding(vertical = 2.dp)
                 ) {
-                    Text("• ", color = levelColor, fontSize = 12.sp)
-                    Text(reason, fontSize = 12.sp, color = Color(0xFFCBD5E1))
+                    Text("• ", color = levelColor, fontSize = 11.sp)
+                    Text(reason, fontSize = 11.sp, color = Color(0xFFCBD5E1))
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            // Extracted Indicators (e.g. URLs)
+            if (alert.indicators.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Extracted Indicators: ${alert.indicators.joinToString(", ")}",
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFF38BDF8)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Safe Action Box
             Surface(
@@ -613,18 +782,18 @@ fun WarningCard(alert: RiskAnalysisResult) {
                 shape = RoundedCornerShape(8.dp),
                 color = Color(0xFF1E293B)
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(8.dp)) {
                     Text(
                         "SAFE RECOMMENDED ACTION",
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF38BDF8),
                         letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         alert.safeAction,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFFF1F5F9)
                     )
@@ -633,16 +802,26 @@ fun WarningCard(alert: RiskAnalysisResult) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Footer: Analysis Source
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            // Footer: Model version, analysis mode & source
+            Column {
                 Text(
                     "Source: $sourceLabel",
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     color = Color(0xFF64748B),
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+                if (alert.analysisSource == AnalysisSource.BACKEND_ANALYSIS) {
+                    Text(
+                        "Model: ${alert.modelVersion ?: "rules+ml"} | Mode: ${alert.analysisMode ?: "cloud"}${if (alert.uncertaintyRange != null) " | Uncertainty: ${alert.uncertaintyRange}" else ""}",
+                        fontSize = 10.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    "Automated risk scores are assessments, not proof of wrongdoing.",
+                    fontSize = 9.sp,
+                    color = Color(0xFF475569)
                 )
             }
         }
@@ -663,13 +842,13 @@ fun EmptyAlertsCard() {
             Text(
                 "No Active Warnings",
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 color = Color(0xFF94A3B8)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                "Trigger a test case above or send a message in WhatsApp/Telegram to screen.",
-                fontSize = 12.sp,
+                "Select a synthetic test above to verify cloud & local screening.",
+                fontSize = 11.sp,
                 color = Color(0xFF64748B),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
