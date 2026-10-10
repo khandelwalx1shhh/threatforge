@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import type { AnalysisResult } from '../types/api';
 import { request } from '../api/client';
-import { IndicatorsPanel } from '../components/indicators/IndicatorsPanel';
+import { AnalysisResultsPanel } from '../components/analysis/AnalysisResultsPanel';
+import { ErrorState } from '../components/common/ErrorState';
 import styles from './AnalyzePage.module.css';
 
 const SAMPLE_BENIGN = "Hi team, just a reminder about the meeting at 3 PM tomorrow. See you there!";
@@ -35,7 +36,7 @@ export function AnalyzePage() {
       setStatus('success');
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Failed to connect to backend analysis endpoint.');
+      setErrorMsg(err.userMessage || err.message || 'Failed to connect to backend analysis endpoint.');
       setStatus('error');
     }
   }, [message]);
@@ -98,12 +99,6 @@ export function AnalyzePage() {
           >
             {status === 'loading' ? 'Analyzing...' : 'Analyze Content'}
           </button>
-
-          {status === 'error' && (
-            <div className={styles.errorMsg}>
-              ⚠ {errorMsg}
-            </div>
-          )}
         </div>
 
         {/* Right Column: Results */}
@@ -122,40 +117,18 @@ export function AnalyzePage() {
             </div>
           )}
 
+          {status === 'error' && errorMsg && (
+            <ErrorState 
+              message={errorMsg} 
+              onRetry={handleAnalyze} 
+            />
+          )}
+
           {status === 'success' && result && (
-            <div className={styles.resultContent}>
-              <div className={styles.scoreCard}>
-                <div className={styles.scoreTop}>
-                  <span>Overall Risk Score</span>
-                  <span className={`${styles.riskBadge} ${styles[result.risk_level.toLowerCase()]}`}>
-                    {result.risk_level}
-                  </span>
-                </div>
-                <div className={styles.scoreValue}>
-                  {result.risk_score} <small>/ 100</small>
-                </div>
-                <p className={styles.summary}>{result.summary}</p>
-              </div>
-
-              {result.breakdown && result.breakdown.length > 0 && (
-                <div className={styles.reasonsBox}>
-                  <h4>Risk Factors</h4>
-                  <ul className={styles.reasonsList}>
-                    {result.breakdown.map((r, i) => (
-                      <li key={i}>
-                        <span className={styles.factorName}>{r.factor}</span>
-                        <span className={styles.factorDesc}>{r.description}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <IndicatorsPanel 
-                status="success" 
-                indicators={result.indicators || []} 
-              />
-            </div>
+            <AnalysisResultsPanel 
+              result={result} 
+              onEdit={() => setStatus('idle')} 
+            />
           )}
         </div>
       </div>
