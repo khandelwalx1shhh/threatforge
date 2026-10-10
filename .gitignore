@@ -42,3 +42,18 @@ venv.bak/
 .vscode/
 .idea/
 *.swp
+
+# Node & Frontend
+node_modules/
+/src/
+
+# Android
+.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+local.properties
+*.apk
+*.ap_
+*.dex
+.cxx/
