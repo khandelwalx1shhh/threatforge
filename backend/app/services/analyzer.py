@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from app.schemas.analyze import AnalyzeResponse
 from app.schemas.common import ExtractedIndicator, RiskBreakdownFactor, SeverityEnum
@@ -35,13 +35,14 @@ CRYPTO_PATTERNS = re.compile(
 def analyze_scam_risk(message: str, sender: Optional[str] = None) -> AnalyzeResponse:
     """
     Evaluates suspicious message text for scam risk using deterministic rule-based explainable scoring.
-    Evaluates Urgency/Pressure, OTP/Credential Requests, Financial Demands, Suspicious Links, Impersonation, and Crypto.
+    Provides stable reason codes, evidence snippets, confidence metrics, and uncertainty range.
     """
     if not message or not message.strip():
-        # Benign default for empty string
         return AnalyzeResponse(
             risk_score=0.0,
             risk_level=SeverityEnum.LOW,
+            confidence_score=0.95,
+            uncertainty_range="±2%",
             summary="Empty input analyzed. No risk indicators detected.",
             breakdown=[],
             indicators=[],
@@ -55,27 +56,35 @@ def analyze_scam_risk(message: str, sender: Optional[str] = None) -> AnalyzeResp
     breakdown: List[RiskBreakdownFactor] = []
     recommendations: List[str] = []
 
-    # 2. Evaluate Risk Factors
+    # 2. Evaluate Risk Factors with stable reason codes & evidence snippets
 
     # Factor A: Urgency / Coercion
     urgency_matches = URGENCY_PATTERNS.findall(message)
     if urgency_matches:
+        match_snippet = urgency_matches[0]
         breakdown.append(RiskBreakdownFactor(
+            code="URGENT_TACTICS",
+            label="Urgency & Pressure Tactics",
             factor="Urgency & Pressure Tactics",
             score=25.0,
-            description=f"Message uses high-pressure or coercive language ('{urgency_matches[0]}').",
-            severity=SeverityEnum.HIGH
+            description=f"Message uses high-pressure or coercive language ('{match_snippet}').",
+            severity=SeverityEnum.HIGH,
+            evidence=match_snippet
         ))
         recommendations.append("Do not succumb to artificial urgency or threats of legal/account action.")
 
     # Factor B: OTP / Credential Request
     otp_matches = OTP_PATTERNS.findall(message)
     if otp_matches:
+        match_snippet = otp_matches[0]
         breakdown.append(RiskBreakdownFactor(
+            code="OTP_HARVESTING",
+            label="Credential & OTP Harvesting",
             factor="Credential & OTP Harvesting",
             score=30.0,
-            description=f"Explicitly requests sensitive authentication data ('{otp_matches[0]}').",
-            severity=SeverityEnum.CRITICAL
+            description=f"Explicitly requests sensitive authentication data ('{match_snippet}').",
+            severity=SeverityEnum.CRITICAL,
+            evidence=match_snippet
         ))
         recommendations.append("NEVER share OTPs, passwords, or PINs with anyone. Legitimate entities never ask for them.")
 
@@ -83,12 +92,15 @@ def analyze_scam_risk(message: str, sender: Optional[str] = None) -> AnalyzeResp
     payment_matches = PAYMENT_PATTERNS.findall(message)
     has_bank_or_upi = any(i.type in ["Bank Account", "UPI ID"] for i in indicators)
     if payment_matches or has_bank_or_upi:
-        payment_detail = payment_matches[0] if payment_matches else "payment details detected"
+        evidence_str = payment_matches[0] if payment_matches else (indicators[0].value if indicators else "financial request")
         breakdown.append(RiskBreakdownFactor(
+            code="UNSOLICITED_PAYMENT",
+            label="Unsolicited Payment Request",
             factor="Unsolicited Payment Request",
             score=25.0,
-            description=f"Requests monetary transfer or provides direct payment details ('{payment_detail}').",
-            severity=SeverityEnum.HIGH
+            description=f"Requests monetary transfer or provides direct payment details ('{evidence_str}').",
+            severity=SeverityEnum.HIGH,
+            evidence=evidence_str
         ))
         recommendations.append("Do not send money or initiate UPI transfers to unverified accounts.")
 
@@ -97,34 +109,46 @@ def analyze_scam_risk(message: str, sender: Optional[str] = None) -> AnalyzeResp
     if urls:
         suspicious_urls = [u for u in urls if u.severity in [SeverityEnum.HIGH, SeverityEnum.CRITICAL]]
         link_score = 30.0 if suspicious_urls else 20.0
+        evidence_str = urls[0].value
         breakdown.append(RiskBreakdownFactor(
+            code="SUSPICIOUS_LINK",
+            label="Suspicious Links & Phishing URL",
             factor="Suspicious Links & Phishing URL",
             score=link_score,
-            description=f"Contains {len(urls)} link(s) pointing to external or unverified web domains.",
-            severity=SeverityEnum.HIGH if not suspicious_urls else SeverityEnum.CRITICAL
+            description=f"Contains {len(urls)} link(s) pointing to external or unverified web domains ('{evidence_str}').",
+            severity=SeverityEnum.HIGH if not suspicious_urls else SeverityEnum.CRITICAL,
+            evidence=evidence_str
         ))
         recommendations.append("Do not click links in unsolicited messages. Access banking portals directly via official apps or bookmarks.")
 
     # Factor E: Impersonation of Authority
     impersonation_matches = IMPERSONATION_PATTERNS.findall(message)
     if impersonation_matches:
+        match_snippet = impersonation_matches[0]
         breakdown.append(RiskBreakdownFactor(
+            code="AUTHORITY_IMPERSONATION",
+            label="Authority Impersonation",
             factor="Authority Impersonation",
             score=15.0,
-            description=f"Claims affiliation with an official organization or support service ('{impersonation_matches[0]}').",
-            severity=SeverityEnum.MEDIUM
+            description=f"Claims affiliation with an official organization or support service ('{match_snippet}').",
+            severity=SeverityEnum.MEDIUM,
+            evidence=match_snippet
         ))
         recommendations.append("Verify the sender's identity independently through official public telephone directories.")
 
     # Factor F: Cryptocurrency Payment Request
     crypto_matches = CRYPTO_PATTERNS.findall(message)
-    has_crypto_ioc = any(i.type == "Crypto Wallet" for i in indicators)
-    if crypto_matches or has_crypto_ioc:
+    crypto_iocs = [i for i in indicators if i.type == "Crypto Wallet"]
+    if crypto_matches or crypto_iocs:
+        evidence_str = crypto_iocs[0].value if crypto_iocs else (crypto_matches[0] if crypto_matches else "crypto transfer")
         breakdown.append(RiskBreakdownFactor(
+            code="CRYPTO_DEMAND",
+            label="Cryptocurrency Demand",
             factor="Cryptocurrency Demand",
             score=25.0,
-            description="Demands payment or transfer via irreversible cryptocurrency assets.",
-            severity=SeverityEnum.CRITICAL
+            description=f"Demands payment or transfer via irreversible cryptocurrency assets ('{evidence_str}').",
+            severity=SeverityEnum.CRITICAL,
+            evidence=evidence_str
         ))
         recommendations.append("Exercise extreme caution: Cryptocurrency transfers cannot be reversed once completed.")
 
@@ -142,15 +166,26 @@ def analyze_scam_risk(message: str, sender: Optional[str] = None) -> AnalyzeResp
     else:
         risk_level = SeverityEnum.LOW
 
-    # 4. Executive Summary Generation
-    if risk_score >= 80.0:
-        summary = f"CRITICAL RISK (Score: {risk_score}/100): High probability of malicious scam/phishing attempt. Multiple critical risk indicators present."
-    elif risk_score >= 50.0:
-        summary = f"HIGH RISK (Score: {risk_score}/100): Suspicious patterns detected. Exercise heightened vigilance before interacting."
-    elif risk_score >= 25.0:
-        summary = f"MEDIUM RISK (Score: {risk_score}/100): Minor suspicious signals identified. Proceed with standard caution."
+    # 4. Uncertainty & Confidence metrics
+    if len(breakdown) >= 3:
+        confidence_score = 0.94
+        uncertainty_range = "±3%"
+    elif len(breakdown) >= 1:
+        confidence_score = 0.90
+        uncertainty_range = "±5%"
     else:
-        summary = f"LOW RISK (Score: {risk_score}/100): No high-risk scam indicators found in message body."
+        confidence_score = 0.95
+        uncertainty_range = "±2%"
+
+    # 5. Executive Summary Generation
+    if risk_score >= 80.0:
+        summary = f"CRITICAL RISK (Score: {risk_score}/100, Confidence: {int(confidence_score*100)}% {uncertainty_range}): High probability of malicious scam/phishing attempt."
+    elif risk_score >= 50.0:
+        summary = f"HIGH RISK (Score: {risk_score}/100, Confidence: {int(confidence_score*100)}% {uncertainty_range}): Suspicious threat patterns detected."
+    elif risk_score >= 25.0:
+        summary = f"MEDIUM RISK (Score: {risk_score}/100, Confidence: {int(confidence_score*100)}% {uncertainty_range}): Minor suspicious signals identified."
+    else:
+        summary = f"LOW RISK (Score: {risk_score}/100, Confidence: {int(confidence_score*100)}% {uncertainty_range}): No high-risk scam indicators found."
 
     if not recommendations:
         recommendations.append("Message appears benign. Maintain standard cyber hygiene practices.")
@@ -158,6 +193,8 @@ def analyze_scam_risk(message: str, sender: Optional[str] = None) -> AnalyzeResp
     return AnalyzeResponse(
         risk_score=risk_score,
         risk_level=risk_level,
+        confidence_score=confidence_score,
+        uncertainty_range=uncertainty_range,
         summary=summary,
         breakdown=breakdown,
         indicators=indicators,
