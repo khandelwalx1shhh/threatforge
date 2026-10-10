@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base, SessionLocal
@@ -86,6 +88,48 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Phase 5: Consistent Error Exception Handlers
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    messages = []
+    for err in errors:
+        loc = " -> ".join([str(x) for x in err.get("loc", []) if str(x) != "body"])
+        msg = err.get("msg", "Invalid field")
+        messages.append(f"{loc}: {msg}" if loc else msg)
+    readable_msg = "; ".join(messages) or "Validation failed for input parameters."
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"error": {"code": "VALIDATION_ERROR", "message": readable_msg}}
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    code_str = "BAD_REQUEST"
+    if exc.status_code == 404:
+        code_str = "NOT_FOUND"
+    elif exc.status_code == 422:
+        code_str = "VALIDATION_ERROR"
+    elif exc.status_code == 401:
+        code_str = "UNAUTHORIZED"
+    elif exc.status_code == 403:
+        code_str = "FORBIDDEN"
+
+    message_str = exc.detail if isinstance(exc.detail, str) else "HTTP Exception"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": code_str, "message": message_str}}
+    )
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # Ensure internal server errors never expose secrets or raw message contents
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": "An unexpected server error occurred. Please try again later."}}
+    )
 
 # Register API routers
 app.include_router(analyze.router)

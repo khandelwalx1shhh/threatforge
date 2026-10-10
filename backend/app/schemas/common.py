@@ -28,7 +28,10 @@ class ExtractedIndicator(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata (e.g., domain registrar, ISP)")
 
 class RiskBreakdownFactor(BaseModel):
+    code: str = Field(default="GENERIC_RISK", description="Stable machine-readable reason code")
+    label: str = Field(default="Generic Risk Factor", description="Human-readable title/label for risk factor")
     factor: str = Field(..., description="Name of the risk factor (e.g., Urgency Language, Crypto Payment)")
     score: float = Field(..., ge=0.0, le=100.0, description="Score contribution for this factor")
     description: str = Field(..., description="Explanation of why this factor contributed to risk")
     severity: SeverityEnum = Field(default=SeverityEnum.MEDIUM)
+    evidence: Optional[str] = Field(default=None, description="Matched text snippet or evidence extracted from message")

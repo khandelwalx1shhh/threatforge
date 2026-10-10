@@ -10,6 +10,8 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeResponse(BaseModel):
     risk_score: float = Field(..., ge=0.0, le=100.0, description="Overall risk score from 0 (safe) to 100 (critical scam)")
     risk_level: SeverityEnum = Field(..., description="Calculated risk level: LOW, MEDIUM, HIGH, CRITICAL")
+    confidence_score: float = Field(default=0.90, ge=0.0, le=1.0, description="Overall confidence rating in risk calculation")
+    uncertainty_range: str = Field(default="±5%", description="Uncertainty range metric e.g. ±5%")
     summary: str = Field(..., description="Executive summary of analysis findings")
     breakdown: List[RiskBreakdownFactor] = Field(default_factory=list, description="Explainable breakdown of risk factors")
     indicators: List[ExtractedIndicator] = Field(default_factory=list, description="Threat indicators detected in text")
