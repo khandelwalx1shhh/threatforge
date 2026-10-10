@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 import { checkBackendHealth } from './api/client';
+import { IndicatorsPanel } from './components/indicators/IndicatorsPanel';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -65,11 +66,19 @@ function App() {
         </section>
 
         <section className="content-grid">
-          <article className="panel threat-panel" id="threats">
-            <div className="panel-heading"><div><h2>Captured indicators</h2><p>Recently identified threat intelligence</p></div><button className="text-btn" onClick={() => window.location.hash = 'indicators'}>View all ↗</button></div>
-            <div className="table-wrap"><table><thead><tr><th>TYPE</th><th>INDICATOR</th><th>SEVERITY</th><th>DETECTED</th></tr></thead><tbody>{threats.map((t) => <tr key={t.value}><td><span className="type-icon">⌁</span>{t.type}</td><td className="indicator">{t.value}</td><td><span className={`severity ${t.severity.toLowerCase()}`}>{t.severity}</span></td><td className="muted">{t.time}</td></tr>)}</tbody></table></div>
-            <div className="panel-footer">Showing sample data for demonstration</div>
-          </article>
+          <div id="threats">
+            {/* Development-only mock adapter for Phase 1 demo data. 
+                TODO: Replace with actual backend response from /api/extract when integration is ready */}
+            <IndicatorsPanel 
+              status="success"
+              indicators={threats.map(t => ({
+                type: t.type,
+                value: t.value,
+                severity: t.severity as any,
+                confidence: t.severity === 'HIGH' ? 0.95 : t.severity === 'MEDIUM' ? 0.75 : 0.45
+              }))} 
+            />
+          </div>
 
           <article className="panel activity-panel" id="sessions">
             <div className="panel-heading"><div><h2>Recent activity</h2><p>Latest events across your honeypot</p></div><span className="live-label"><i /> LIVE</span></div>

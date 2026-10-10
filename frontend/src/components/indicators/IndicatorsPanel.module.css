@@ -1,0 +1,87 @@
+.panel {
+  background: linear-gradient(145deg, #111925, #0d131e);
+  border: 1px solid #202b3a;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h3 {
+  margin: 0;
+  font: 600 16px 'Space Grotesk', sans-serif;
+  color: #e7edf6;
+}
+
+.badge {
+  background: #1b2a26;
+  color: #b5f36b;
+  border: 1px solid #25312f;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.emptyState {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  min-height: 200px;
+  color: #8491a4;
+  font-size: 14px;
+}
+
+.emptyState p {
+  margin: 12px 0 0;
+}
+
+.disclaimer {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #5e6c80;
+}
+
+.idleIcon, .safeIcon, .errorIcon {
+  font-size: 32px;
+  display: block;
+  opacity: 0.8;
+}
+
+.errorIcon {
+  color: #ff8b94;
+}
+
+.safeIcon {
+  color: #b5f36b;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #1b2431;
+  border-top-color: #b5f36b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
