@@ -1,7 +1,12 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export class ApiError extends Error {
-  constructor(public status: number, public message: string, public body?: unknown) {
+  constructor(
+    public status: number,
+    public message: string, // Developer/debug message
+    public userMessage: string, // Safe for UI
+    public body?: unknown
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -18,21 +23,43 @@ export async function request<T>(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(url, { ...options, headers });
-
-  let responseBody: unknown;
+  let response: Response;
   try {
-    // Attempt to parse JSON; fallback to text if parsing fails
+    response = await fetch(url, { ...options, headers });
+  } catch (err: any) {
+    // Network or CORS error
+    throw new ApiError(0, err.message, 'Unable to reach the server. Please check your connection and try again.');
+  }
+
+  let responseBody: any;
+  try {
     const text = await response.text();
     responseBody = text ? JSON.parse(text) : undefined;
   } catch (e) {
-    // Keep responseBody as undefined or string depending on requirements
+    // Keep responseBody undefined if unparseable
   }
 
   if (!response.ok) {
+    let userMessage = 'Analysis could not be completed. Please try again later.';
+    
+    if (response.status === 422 && responseBody?.detail) {
+      // Handle FastAPI validation errors safely
+      const details = Array.isArray(responseBody.detail) ? responseBody.detail : [];
+      if (details.length > 0 && details[0].msg) {
+        userMessage = `Validation Error: ${details[0].msg}`;
+      } else {
+        userMessage = 'Please check your input and try again.';
+      }
+    } else if (response.status >= 400 && response.status < 500) {
+      userMessage = responseBody?.detail && typeof responseBody.detail === 'string'
+        ? responseBody.detail // Assuming backend detail is safe for 4xx if it's a string
+        : 'The request was invalid. Please check your input.';
+    }
+
     throw new ApiError(
       response.status,
       `API request failed with status ${response.status}`,
+      userMessage,
       responseBody
     );
   }
