@@ -1,4 +1,6 @@
-import './App.css'
+import { useState, useEffect } from 'react';
+import './App.css';
+import { checkBackendHealth } from './api/client';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -16,6 +18,22 @@ const activity = [
 ]
 
 function App() {
+  const [healthStatus, setHealthStatus] = useState<'Checking' | 'Connected' | 'Offline'>('Checking');
+
+  useEffect(() => {
+    let mounted = true;
+    checkBackendHealth()
+      .then((res) => {
+        if (mounted) {
+          setHealthStatus(res.status === 'ok' ? 'Connected' : 'Offline');
+        }
+      })
+      .catch(() => {
+        if (mounted) setHealthStatus('Offline');
+      });
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -62,7 +80,32 @@ function App() {
 
         <section className="bottom-grid" id="indicators">
           <article className="panel mini-panel"><div className="panel-heading"><div><h2>Threat distribution</h2><p>By indicator category</p></div></div><div className="distribution"><div className="dist-row"><span>Phishing URLs</span><div className="bar-track"><div className="bar phishing" style={{ width: '76%' }} /></div><b>76</b></div><div className="dist-row"><span>Phone numbers</span><div className="bar-track"><div className="bar phone" style={{ width: '54%' }} /></div><b>54</b></div><div className="dist-row"><span>UPI IDs</span><div className="bar-track"><div className="bar upi" style={{ width: '42%' }} /></div><b>42</b></div><div className="dist-row"><span>Other indicators</span><div className="bar-track"><div className="bar other" style={{ width: '28%' }} /></div><b>28</b></div></div></article>
-          <article className="panel mini-panel"><div className="panel-heading"><div><h2>System health</h2><p>API: {API_BASE_URL}</p></div><span className="health-badge">● HEALTHY</span></div><div className="health-list"><div><span>Frontend</span><b><i /> Online</b></div><div><span>API connection</span><b className="waiting"><i /> Not connected</b></div><div><span>Threat analysis</span><b><i /> Demo mode</b></div></div><div className="health-note">Backend integration will be enabled when the API is configured.</div></article>
+          <article className="panel mini-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>System health</h2>
+                <p>API: {API_BASE_URL}</p>
+              </div>
+              {healthStatus === 'Checking' && <span className="health-badge" style={{color: '#f1c779', background: '#32251f'}}>● CHECKING</span>}
+              {healthStatus === 'Connected' && <span className="health-badge">● HEALTHY</span>}
+              {healthStatus === 'Offline' && <span className="health-badge" style={{color: '#ff8188', background: '#2b1a24'}}>● OFFLINE</span>}
+            </div>
+            <div className="health-list">
+              <div><span>Frontend</span><b><i /> Online</b></div>
+              <div>
+                <span>API connection</span>
+                {healthStatus === 'Connected' ? (
+                  <b><i /> Connected</b>
+                ) : healthStatus === 'Checking' ? (
+                  <b className="waiting"><i /> Checking...</b>
+                ) : (
+                  <b style={{color: '#ff8188'}}><i style={{background: '#ff8188', boxShadow: 'none'}} /> Unreachable</b>
+                )}
+              </div>
+              <div><span>Threat analysis</span><b><i /> Demo mode</b></div>
+            </div>
+            <div className="health-note">Backend integration will be enabled when the API is configured.</div>
+          </article>
         </section>
         <footer className="footer"><span>ThreatForge <span className="accent">●</span> Threat intelligence platform</span><span>Hackathon MVP · Demo data only</span></footer>
       </main>
