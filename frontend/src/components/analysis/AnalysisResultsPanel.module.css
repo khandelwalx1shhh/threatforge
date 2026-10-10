@@ -467,3 +467,14 @@
   align-items: center;
   gap: 0.4rem;
 }
+
+.authNotice {
+  background: rgba(99, 102, 241, 0.08);
+  border-left: 3px solid #6366f1;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.8rem;
+  color: #c7d2fe;
+  line-height: 1.45;
+}
+

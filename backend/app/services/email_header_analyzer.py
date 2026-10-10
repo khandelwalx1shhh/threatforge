@@ -28,8 +28,21 @@ WELL_KNOWN_TARGET_BRANDS: Dict[str, List[str]] = {
     "usps": ["usps.com", "usps.gov"],
 }
 
+REPORTED_AUTH_DISCLAIMER = (
+    "Authentication results (SPF/DKIM/DMARC) are parsed from self-reported message headers. "
+    "They reflect the upstream MTA's reported status if untampered, but were not independently verified by THREATFORGE against live DNS/cryptographic records."
+)
+
 class EmailHeaderAnalysisResult(BaseModel):
     has_headers: bool = Field(default=False, description="Whether email headers were detected or provided")
+    authentication_mode: str = Field(
+        default="parsed_reported_headers",
+        description="Mode of authentication analysis: parsed_reported_headers (not independent live DNS resolution)"
+    )
+    verification_disclaimer: str = Field(
+        default=REPORTED_AUTH_DISCLAIMER,
+        description="Explicit notice that header security results are parsed from reported headers, not verified live"
+    )
     from_header: Optional[str] = Field(default=None, description="Full From header value")
     from_address: Optional[str] = Field(default=None, description="Parsed email address in From header")
     from_domain: Optional[str] = Field(default=None, description="Sender domain extracted from From header")
@@ -96,7 +109,7 @@ def detect_raw_email_headers(text: str) -> Tuple[Optional[str], str]:
     parts = re.split(r'\r?\n\r?\n', text, maxsplit=1)
     if len(parts) == 2:
         header_part, body_part = parts
-        # Confirm header_part has at least 2 header lines
+        # Confirm header_part has at least 2 header lines or a colon header separator
         if "\n" in header_part or ":" in header_part:
             return header_part.strip(), body_part.strip()
     
@@ -111,60 +124,79 @@ class EmailHeaderAnalyzer:
         headers_dict: Optional[Dict[str, str]] = None
     ) -> EmailHeaderAnalysisResult:
         if not raw_headers and not headers_dict:
-            return EmailHeaderAnalysisResult(has_headers=False, summary="No email headers provided.")
+            return EmailHeaderAnalysisResult(
+                has_headers=False,
+                summary="No email headers provided."
+            )
 
-        headers: Dict[str, str] = {}
+        # Collect list of (header_key, header_val) preserving duplicates
+        headers_list: List[Tuple[str, str]] = []
         if raw_headers:
             parsed = email.message_from_string(raw_headers)
             for k, v in parsed.items():
-                headers[k.lower()] = str(v)
+                headers_list.append((k.lower(), str(v)))
         
         if headers_dict:
             for k, v in headers_dict.items():
-                headers[k.lower()] = str(v)
+                headers_list.append((k.lower(), str(v)))
 
-        if not headers:
-            return EmailHeaderAnalysisResult(has_headers=False, summary="No valid headers parsed.")
+        if not headers_list:
+            return EmailHeaderAnalysisResult(
+                has_headers=False,
+                summary="No valid headers parsed."
+            )
 
         anomalies: List[str] = []
         risk_boost = 0
 
+        # Helper to get first header value
+        def get_first(key: str) -> str:
+            for k, v in headers_list:
+                if k == key:
+                    return v
+            return ""
+
+        # Helper to get all header values for a key
+        def get_all(key: str) -> List[str]:
+            return [v for k, v in headers_list if k == key]
+
         # 1. From Header
-        from_hdr = headers.get("from", "")
+        from_hdr = get_first("from")
         display_name, from_addr = parseaddr(from_hdr)
         from_domain = from_addr.split("@")[-1].lower() if "@" in from_addr else None
 
         # 2. Return-Path
-        return_path_hdr = headers.get("return-path", "")
+        return_path_hdr = get_first("return-path")
         _, return_path_addr = parseaddr(return_path_hdr)
         return_path_domain = return_path_addr.split("@")[-1].lower() if "@" in return_path_addr else None
 
         # 3. Reply-To
-        reply_to_hdr = headers.get("reply-to", "")
+        reply_to_hdr = get_first("reply-to")
         _, reply_to_addr = parseaddr(reply_to_hdr)
         reply_to_domain = reply_to_addr.split("@")[-1].lower() if "@" in reply_to_addr else None
 
-        # 4. SPF
+        # 4. SPF: search all Received-SPF and Authentication-Results headers
         spf_status = None
-        rec_spf = headers.get("received-spf", "")
-        if rec_spf:
+        for rec_spf in get_all("received-spf"):
             spf_match = re.search(r'\b(pass|fail|softfail|neutral|none|permerror)\b', rec_spf.lower())
             if spf_match:
                 spf_status = spf_match.group(1)
+                if spf_status in ["fail", "softfail"]:
+                    break
 
-        # 5. Authentication-Results
-        auth_results = headers.get("authentication-results", "")
-        if auth_results:
-            parsed_auth = parse_auth_results(auth_results)
+        # 5. Authentication-Results: search all Authentication-Results headers
+        dkim_status = None
+        dmarc_status = None
+        for auth_entry in get_all("authentication-results"):
+            parsed_auth = parse_auth_results(auth_entry)
             if not spf_status and "spf" in parsed_auth:
                 spf_status = parsed_auth["spf"]
-            dkim_status = parsed_auth.get("dkim")
-            dmarc_status = parsed_auth.get("dmarc")
-        else:
-            dkim_status = None
-            dmarc_status = None
+            if not dkim_status and "dkim" in parsed_auth:
+                dkim_status = parsed_auth["dkim"]
+            if not dmarc_status and "dmarc" in parsed_auth:
+                dmarc_status = parsed_auth["dmarc"]
 
-        if not dkim_status and "dkim-signature" in headers:
+        if not dkim_status and any(k == "dkim-signature" for k, _ in headers_list):
             dkim_status = "present"
 
         # Check SPF failure
@@ -185,7 +217,6 @@ class EmailHeaderAnalyzer:
         # 6. Domain Alignment & Mismatched Return-Path / Reply-To
         domain_alignment = True
         if from_domain and return_path_domain:
-            # Check if domains match or share same root
             from_root = ".".join(from_domain.split(".")[-2:])
             return_root = ".".join(return_path_domain.split(".")[-2:])
             if from_root != return_root:
@@ -227,6 +258,8 @@ class EmailHeaderAnalyzer:
 
         return EmailHeaderAnalysisResult(
             has_headers=True,
+            authentication_mode="parsed_reported_headers",
+            verification_disclaimer=REPORTED_AUTH_DISCLAIMER,
             from_header=from_hdr or None,
             from_address=from_addr or None,
             from_domain=from_domain,

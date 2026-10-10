@@ -85,6 +85,8 @@ def test_unverified_model_mapping_behavior():
     # The actual Hugging Face model config has LABEL_0..3 without verified id2label
     pred = distilbert_detector.predict("Sample email body for testing.")
     assert pred.verification_status == "unverified"
+    assert pred.verified_class_label is None
+    assert pred.risk_assessment is None
     assert pred.warning is not None
     assert "unverified" in pred.warning.lower()
 
@@ -98,6 +100,8 @@ def test_verified_model_mapping_mock():
             data = res.json()
             assert data["verification_status"] == "verified"
             assert data["warning"] is None
+            assert data["verified_class_label"] is not None
+            assert data["risk_assessment"] is not None
 
 # 6. Model-loading and inference failures (Graceful Fallback)
 def test_model_loading_failure_fallback():

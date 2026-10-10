@@ -141,7 +141,10 @@ app.include_router(dashboard.router)
 @app.get("/health", tags=["Health"])
 def health_check():
     from app.services.model_manager import model_manager
+    from app.services.distilbert_detector import distilbert_detector
     return {
         "status": "ok",
-        "model_loaded": model_manager.is_loaded
+        "model_loaded": model_manager.is_loaded,
+        "distilbert_loaded": distilbert_detector.is_loaded,
+        "distilbert_quantized": distilbert_detector.is_quantized
     }

@@ -46,6 +46,7 @@ export interface DistilBertResult {
   latency_ms?: number | null;
   predicted_class_index?: number | null;
   predicted_class_label?: string | null;
+  verified_class_label?: string | null;
   candidate_class_label?: string | null;
   class_probabilities?: Record<string, number>;
   candidate_probabilities?: Record<string, number>;
@@ -58,6 +59,8 @@ export interface DistilBertResult {
 
 export interface EmailHeaderAnalysis {
   has_headers: boolean;
+  authentication_mode?: string;
+  verification_disclaimer?: string;
   from_header?: string | null;
   from_address?: string | null;
   from_domain?: string | null;
@@ -89,10 +92,12 @@ export interface AnalysisResult {
   model_name?: string;
   predicted_class_index?: number | null;
   predicted_class_label?: string | null;
+  verified_class_label?: string | null;
   candidate_class_label?: string | null;
   class_probabilities?: Record<string, number>;
   candidate_probabilities?: Record<string, number>;
   verification_status?: string;
+  risk_assessment?: string | null;
   is_quantized?: boolean;
   latency_ms?: number | null;
   warning?: string | null;

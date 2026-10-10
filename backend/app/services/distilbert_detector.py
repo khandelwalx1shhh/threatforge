@@ -27,6 +27,7 @@ class DistilBertPrediction(BaseModel):
     latency_ms: Optional[float] = Field(default=None, description="Inference latency in milliseconds")
     predicted_class_index: Optional[int] = None
     predicted_class_label: Optional[str] = None
+    verified_class_label: Optional[str] = Field(default=None, description="Verified semantic class label, if officially verified in model config")
     candidate_class_label: Optional[str] = None
     class_probabilities: Dict[str, float] = Field(default_factory=dict)
     candidate_probabilities: Dict[str, float] = Field(default_factory=dict)
@@ -37,7 +38,10 @@ class DistilBertPrediction(BaseModel):
     )
     warning: Optional[str] = None
     explanation: str = Field(default="")
-    risk_assessment: Optional[str] = None
+    risk_assessment: Optional[str] = Field(
+        default=None,
+        description="Risk assessment, populated ONLY when class mapping is verified"
+    )
 
 class DistilBertDetector:
     """
@@ -203,7 +207,13 @@ class DistilBertDetector:
                 f"Status: {verification_status}."
             )
 
-            risk_assessment = "suspicious" if predicted_idx in {1, 3} else "low_statistical_anomaly"
+            # Verified class label and risk assessment are populated ONLY when officially verified in config
+            if self.is_label_mapping_verified:
+                verified_class_label = raw_label
+                risk_assessment = "suspicious" if predicted_idx in {1, 3} else "benign"
+            else:
+                verified_class_label = None
+                risk_assessment = None
 
             return DistilBertPrediction(
                 model_name=self.model_id,
@@ -213,6 +223,7 @@ class DistilBertDetector:
                 latency_ms=latency_ms,
                 predicted_class_index=predicted_idx,
                 predicted_class_label=raw_label,
+                verified_class_label=verified_class_label,
                 candidate_class_label=candidate_label,
                 class_probabilities=class_probs,
                 candidate_probabilities=candidate_probs,

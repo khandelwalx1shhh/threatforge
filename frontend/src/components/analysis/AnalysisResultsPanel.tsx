@@ -126,6 +126,13 @@ export function AnalysisResultsPanel({ result, onEdit }: AnalysisResultsPanelPro
                 ))}
               </ul>
             )}
+
+            {/* Authentication Disclaimer */}
+            {headerAnalysis.verification_disclaimer && (
+              <div className={styles.authNotice}>
+                ℹ️ <strong>Authentication Notice:</strong> {headerAnalysis.verification_disclaimer}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -164,7 +171,7 @@ export function AnalysisResultsPanel({ result, onEdit }: AnalysisResultsPanelPro
 
             <div className={styles.distilbertGrid}>
               <div className={styles.statBox}>
-                <span className={styles.statLabel}>Predicted Class</span>
+                <span className={styles.statLabel}>Raw Model Output</span>
                 <span className={styles.statValue}>
                   Index {result.distilbert?.predicted_class_index ?? result.predicted_class_index ?? "—"}
                   {" ("}
@@ -176,6 +183,12 @@ export function AnalysisResultsPanel({ result, onEdit }: AnalysisResultsPanelPro
                 <span className={styles.statLabel}>Candidate Label</span>
                 <span className={styles.statValue}>
                   {result.distilbert?.candidate_class_label || result.candidate_class_label || "N/A"}
+                </span>
+              </div>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>Verified Class</span>
+                <span className={styles.statValue}>
+                  {result.distilbert?.verified_class_label || result.verified_class_label || "None (Unverified)"}
                 </span>
               </div>
               <div className={styles.statBox}>
