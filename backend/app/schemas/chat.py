@@ -14,3 +14,7 @@ class ChatResponse(BaseModel):
     tactics_detected: List[str] = Field(default_factory=list, description="Scam tactics identified in incoming message")
     extracted_iocs: List[ExtractedIndicator] = Field(default_factory=list, description="Indicators captured during this exchange")
     turn_count: int = Field(default=1, description="Current turn index in conversation")
+    safety_note: str = Field(
+        default="SIMULATION ONLY: This honeypot response is generated locally inside an isolated sandbox. No real external messages are sent.",
+        description="Safety warning guaranteeing no outbound network/SMS messages are dispatched to external entities."
+    )

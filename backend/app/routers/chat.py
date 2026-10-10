@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.honeypot_agent import process_honeypot_chat
+from app.services.honeypot import run_honeypot_chat_turn
 
 router = APIRouter(prefix="/api", tags=["Honeypot Chat"])
 
@@ -11,7 +11,7 @@ def chat_honeypot(payload: ChatRequest, db: Session = Depends(get_db)):
     """
     POST /api/chat
     Simulated honeypot persona response generation.
-    Engages scammers safely in a controlled environment to coax operational intel without real interaction.
+    Engages scammers safely in a controlled local sandbox environment to coax operational intel without real interaction.
     """
     if not payload.message or not payload.message.strip():
         raise HTTPException(
@@ -19,7 +19,7 @@ def chat_honeypot(payload: ChatRequest, db: Session = Depends(get_db)):
             detail="Message payload must not be empty or whitespace-only."
         )
 
-    session, reply, tactics, iocs = process_honeypot_chat(
+    session, reply, tactics, iocs, safety_note = run_honeypot_chat_turn(
         db=db,
         message=payload.message,
         session_id=payload.session_id,
@@ -32,5 +32,6 @@ def chat_honeypot(payload: ChatRequest, db: Session = Depends(get_db)):
         persona=session.persona,
         tactics_detected=tactics,
         extracted_iocs=iocs,
-        turn_count=session.turn_count
+        turn_count=session.turn_count,
+        safety_note=safety_note
     )
