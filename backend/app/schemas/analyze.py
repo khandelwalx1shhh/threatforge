@@ -1,14 +1,17 @@
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import List, Optional, Dict, Any
 from app.schemas.common import ExtractedIndicator, RiskBreakdownFactor
+from app.services.email_header_analyzer import EmailHeaderAnalysisResult
 
 class AnalyzeRequest(BaseModel):
-    text: Optional[str] = Field(default=None, max_length=5000, description="Message text to analyze for scam/fraud risk")
+    text: Optional[str] = Field(default=None, max_length=5000, description="Message text or full email to analyze for scam/fraud risk")
     message: Optional[str] = Field(default=None, max_length=5000, description="Alternative field for message text")
-    source: Optional[str] = Field(default="manual_test", description="Source channel: whatsapp, telegram, manual_test")
+    source: Optional[str] = Field(default="manual_test", description="Source channel: whatsapp, telegram, manual_test, email")
     cloud_analysis: bool = Field(default=False, description="Whether cloud analysis is enabled (defaults to False)")
     sender: Optional[str] = Field(default=None, description="Sender identifier")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Optional extra metadata context")
+    raw_headers: Optional[str] = Field(default=None, description="Raw RFC 822 email headers string")
+    headers: Optional[Dict[str, str]] = Field(default=None, description="Parsed email headers dictionary")
 
     @model_validator(mode="before")
     @classmethod
@@ -19,10 +22,10 @@ class AnalyzeRequest(BaseModel):
         # Validate source
         src = data.get("source", "manual_test")
         if src is not None:
-            valid_sources = {"whatsapp", "telegram", "manual_test"}
+            valid_sources = {"whatsapp", "telegram", "manual_test", "email"}
             src_str = str(src).lower().strip()
             if src_str not in valid_sources:
-                raise ValueError(f"Invalid source '{src}'. Supported sources: whatsapp, telegram, manual_test")
+                raise ValueError(f"Invalid source '{src}'. Supported sources: whatsapp, telegram, manual_test, email")
             data["source"] = src_str
 
         # Validate text or message
@@ -65,3 +68,20 @@ class AnalyzeResponse(BaseModel):
     analyzed_at: Optional[str] = Field(default=None, description="ISO timestamp")
     confidence_score: Optional[float] = Field(default=0.90, description="Confidence rating")
     uncertainty_range: Optional[str] = Field(default="±5%", description="Score uncertainty estimate")
+
+    # DistilBERT Phishing Detection Integration fields
+    model_name: Optional[str] = Field(default="cybersectony/phishing-email-detection-distilbert_v2.4.1", description="Transformer model identifier")
+    predicted_class_index: Optional[int] = Field(default=None, description="Predicted class index (0-3)")
+    predicted_class_label: Optional[str] = Field(default=None, description="Raw label from model config id2label")
+    candidate_class_label: Optional[str] = Field(default=None, description="Author-suggested semantic candidate label")
+    class_probabilities: Optional[Dict[str, float]] = Field(default_factory=dict, description="Softmax probabilities across all classes")
+    candidate_probabilities: Optional[Dict[str, float]] = Field(default_factory=dict, description="Probabilities for candidate labels")
+    verification_status: Optional[str] = Field(default="unverified", description="'verified', 'unverified', or 'unavailable'")
+    is_quantized: Optional[bool] = Field(default=False, description="Whether 8-bit dynamic INT8 CPU quantization is active")
+    latency_ms: Optional[float] = Field(default=None, description="Inference latency in milliseconds")
+    warning: Optional[str] = Field(default=None, description="Security warning regarding model label verification")
+    concise_explanation: Optional[str] = Field(default=None, description="Concise unhallucinated explanation of model output")
+    distilbert: Optional[Dict[str, Any]] = Field(default=None, description="Full nested DistilBERT prediction payload")
+
+    # Dedicated Email Header Security & Authentication Audit
+    header_analysis: Optional[EmailHeaderAnalysisResult] = Field(default=None, description="Email header authentication and spoofing analysis")

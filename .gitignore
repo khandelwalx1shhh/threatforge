@@ -49,3 +49,9 @@ data/
 *.csv
 *.tsv
 *.parquet
+
+# Transformer Weights & Cache
+.cache/
+hf_cache/
+*.safetensors
+*.bin

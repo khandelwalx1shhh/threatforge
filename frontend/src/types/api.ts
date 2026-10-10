@@ -29,8 +29,51 @@ export interface RiskBreakdownFactor {
 
 export interface AnalysisRequest {
   message: string;
+  text?: string;
   sender?: string | null;
+  source?: string;
+  cloud_analysis?: boolean;
   context?: Record<string, any> | null;
+  raw_headers?: string | null;
+  headers?: Record<string, string> | null;
+}
+
+export interface DistilBertResult {
+  model_name: string;
+  model_version: string;
+  is_available: boolean;
+  is_quantized?: boolean;
+  latency_ms?: number | null;
+  predicted_class_index?: number | null;
+  predicted_class_label?: string | null;
+  candidate_class_label?: string | null;
+  class_probabilities?: Record<string, number>;
+  candidate_probabilities?: Record<string, number>;
+  confidence?: number;
+  verification_status: "verified" | "unverified" | "unavailable" | string;
+  warning?: string | null;
+  explanation?: string;
+  risk_assessment?: string | null;
+}
+
+export interface EmailHeaderAnalysis {
+  has_headers: boolean;
+  from_header?: string | null;
+  from_address?: string | null;
+  from_domain?: string | null;
+  display_name?: string | null;
+  return_path?: string | null;
+  return_path_domain?: string | null;
+  reply_to?: string | null;
+  reply_to_domain?: string | null;
+  spf_status?: string | null;
+  dkim_status?: string | null;
+  dmarc_status?: string | null;
+  domain_alignment: boolean;
+  display_name_spoofing: boolean;
+  anomalies: string[];
+  risk_boost: number;
+  summary: string;
 }
 
 export interface AnalysisResult {
@@ -41,6 +84,21 @@ export interface AnalysisResult {
   indicators: Indicator[];
   recommendations: string[];
   analyzed_at: string;
+  reasons?: string[];
+  recommended_action?: string;
+  model_name?: string;
+  predicted_class_index?: number | null;
+  predicted_class_label?: string | null;
+  candidate_class_label?: string | null;
+  class_probabilities?: Record<string, number>;
+  candidate_probabilities?: Record<string, number>;
+  verification_status?: string;
+  is_quantized?: boolean;
+  latency_ms?: number | null;
+  warning?: string | null;
+  concise_explanation?: string | null;
+  distilbert?: DistilBertResult | null;
+  header_analysis?: EmailHeaderAnalysis | null;
 }
 
 export interface ChatRequest {
@@ -107,4 +165,4 @@ export interface ExtractResponse {
 
 // Mapped alias for Reason as asked by the prompt (RiskBreakdownFactor is what backend used)
 export type Reason = RiskBreakdownFactor;
-export type ThreatCase = unknown; // Documented as missing, backend did not provide ThreatCase schema
+export type ThreatCase = unknown;

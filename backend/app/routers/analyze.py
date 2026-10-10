@@ -26,7 +26,9 @@ def analyze_threat(payload: AnalyzeRequest, db: Session = Depends(get_db)):
         message=text_to_analyze,
         sender=payload.sender,
         source=payload.source,
-        cloud_analysis=payload.cloud_analysis
+        cloud_analysis=payload.cloud_analysis,
+        raw_headers=payload.raw_headers,
+        headers=payload.headers
     )
 
     # Persist report to database
