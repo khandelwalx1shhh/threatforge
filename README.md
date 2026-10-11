@@ -14,20 +14,43 @@
 
 ---
 
-> 📘 **Looking for the in-depth system specification?** Check out [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for complete algorithmic breakdowns, dataset training reports, and privacy architecture.
+> 📘 **Detailed Technical Specification**: For complete algorithmic mathematics, feature weights, dataset training reports, and privacy contracts, refer to [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md).
 
 ---
 
-## 🌟 Key Highlights
+## 💡 What is Argus?
 
-- 🛡️ **Native Android 24/7 On-Device Agent**: Real-time background notification inspection (`NotificationListenerService`) for **WhatsApp** and **Telegram** with zero battery drain.
-- 🛑 **Sideloaded APK Package Inspector**: Detects deceptive dropper URLs distributing malicious Android packages (e.g. `wedding_card.apk`, `e-challan_update.apk`, banking trojans).
-- 💸 **UPI Deep Link & QR Intent Auditor**: Neutralizes reverse-charge payment manipulation attacks (`upi://pay?pa=...&am=...`) pretending to be refunds or cashback.
-- ⚡ **INT8 Quantized DistilBERT Transformer**: Sub-30ms on-device neural network CPU inference classifying urgency, social engineering, and phishing patterns.
-- 🌐 **Offline Lexical URL Classifier (23 Features)**: Evaluates URL structure without outbound network requests or crawling (100% target-silent).
-- 🧠 **Gemini GenAI Multi-Turn Reasoning**: Explains attack psychology, extracts Indicators of Compromise (IOCs), and formulates customized countermeasures.
-- 🔒 **Zero-Leakage Privacy Gate**: Redacts OTPs, auth tokens, and credentials client-side; whitelist filters family and friends directly from local contacts.
-- 🖥️ **Modern SOC Command Center**: Dark cyber glassmorphism operations dashboard with real-time telemetry, threat radar, and manual content investigation.
+**Argus** is an autonomous cybersecurity platform engineered to protect users from social engineering, instant messaging fraud, malicious Android APK droppers, and deceptive payment schemes in real time. 
+
+Named after the all-seeing guardian of myth, Argus acts as an intelligent sentinel combining:
+1. **An On-Device Android Agent** that continuously screens incoming messages on WhatsApp and Telegram in the background, issuing instant warning banners before users click malicious links or install malicious files.
+2. **A High-Performance AI & ML Cloud SOC Backend** executing quantized transformer inference, offline lexical URL classification, and Google Gemini GenAI multi-turn reasoning.
+3. **A Centralized SOC Web Command Dashboard** allowing security analysts to monitor live threat telemetry, review intercepted indicators, and manually dissect suspicious payloads.
+
+---
+
+## 🎯 The Problem Argus Solves
+
+Traditional cybersecurity tools (such as desktop antivirus and browser security extensions) are ineffective against modern mobile cyber attacks:
+- **Sideloaded Trojan Droppers**: Attackers disguise malicious `.apk` packages as wedding invitations (`wedding_card.apk`), courier shipment trackers, or traffic e-challan notices sent via WhatsApp. Once installed, these trojans steal OTPs and hijack bank accounts.
+- **Reverse-Charge UPI Intent Fraud**: Scammers send deep links (`upi://pay?pa=...&am=5000`) claiming the user is "receiving a cash prize or cashback refund". In reality, approving the prompt immediately debits money from the victim's account.
+- **Urgency-Driven Social Engineering**: Phishing messages manipulate fear and artificial deadlines ("Account suspended within 24 hours", "Verify KYC immediately") using typosquatted domains (`bank-secure.xyz`).
+- **Privacy Intrusion by Security Tools**: Users hesitate to install security software that logs full personal chat histories, reads contact books, or inspects banking SMS notifications.
+
+**Argus solves all four challenges** with on-device package whitelisting, client-side PII scrubbing, zero outbound web crawling, and sub-30ms multi-model detection.
+
+---
+
+## 🌟 Core Capabilities
+
+- 🛡️ **24/7 Sticky Android Edge Shield**: Runs in the background via `NotificationListenerService` with automatic recovery and near-zero battery consumption.
+- 🛑 **Sideloaded APK Package Inspector**: Detects deceptive `.apk` download links and dropper nomenclature across messaging platforms.
+- 💸 **UPI Deep Link & QR Code Intent Auditor**: Parses `upi://pay` query parameters and flags reverse-charge payment intents before the victim approves them.
+- ⚡ **INT8 Quantized DistilBERT Transformer**: Lightweight on-device neural network CPU inference classifying urgency, social engineering, and phishing patterns in ~28ms.
+- 🌐 **Offline Lexical URL Classifier (23 Features)**: Inspects structural URL properties (entropy, digit ratio, brand typosquatting, high-risk TLDs) without making outbound HTTP requests.
+- 🧠 **Google Gemini GenAI Cognitive Engine**: Explains novel attack strategies, extracts Indicators of Compromise (IOCs), and provides immediate user remediation steps.
+- 🔒 **Zero-Leakage Privacy Gate**: Redacts OTPs, auth tokens, and cards client-side; whitelist filters family and friends directly from saved contacts.
+- 💾 **Persistent On-Device Storage & Retention**: Local storage of threat logs with user-configurable retention policies (`Memory Only`, `24 Hours`, `7 Days`, `30 Days`) and one-tap history wiping.
 
 ---
 
@@ -38,12 +61,12 @@ flowchart TD
     subgraph MobileDevice["Android Client (Edge Defense Layer)"]
         A["Incoming Notification: WhatsApp / Telegram"] --> B[NotificationListenerService]
         B --> C{Package & Contact Whitelist}
-        C -- "Ignored / Family Contact" --> D[Discard Event Immediately]
+        C -- "Ignored App / Family Contact" --> D[Discard Event Immediately]
         C -- "Unknown Sender" --> E[Client-Side PII Scrubber]
         E --> F[Event Deduplicator (SHA-256 / 3m)]
         F --> G[On-Device Heuristic Engine]
         G --> H{Local Only Mode?}
-        H -- "Yes" --> I[Local Alert & Storage]
+        H -- "Yes" --> I[Local Alert & Encrypted Storage]
         H -- "No (Consent Enabled)" --> J[Encrypted Transport to Backend]
     end
 
@@ -134,8 +157,8 @@ pip install -r requirements.txt
 # Launch FastAPI server
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
-- API Docs: `http://localhost:8000/docs`
-- Health Check: `http://localhost:8000/health`
+- Interactive OpenAPI Docs: `http://localhost:8000/docs`
+- Health Endpoint: `http://localhost:8000/health`
 
 ---
 
@@ -153,14 +176,14 @@ npm run dev
 
 ---
 
-### 4. Build & Install Android Mobile Agent
+### 4. Build & Install the Android Mobile Agent
 ```bash
 cd threatforge/android
 
 # Build Debug APK
 .\gradlew.bat assembleDebug
 
-# Connect Android phone via USB (with USB Debugging enabled) and install:
+# Connect phone via USB with USB Debugging enabled, then install:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # Forward device network calls to your local backend server:
@@ -169,18 +192,46 @@ adb reverse tcp:8000 tcp:8000
 
 ---
 
+## 🧪 Real-World Attack Scenarios & How to Test
+
+You can test Argus using either the **Android app's Manual Audit tab**, the **Web Dashboard**, or `curl`:
+
+### Scenario 1: Malicious APK Dropper (`wedding_card.apk`)
+- **Input Text**: `"Please download wedding_card.apk from https://files-host.me/wedding_card.apk to view the invitation"`
+- **Argus Detection**: **CRITICAL RISK (100/100)**
+- **Response**: Emits an alert warning the user that sideloaded APK files from messages frequently deliver banking trojans and keyloggers.
+
+### Scenario 2: Deceptive Reverse-Charge UPI Intent
+- **Input Text**: `"Congratulations! You won cashback. Receive Rs 2500 now: upi://pay?pa=scammer@upi&pn=RewardsDesk&am=2500&cu=INR"`
+- **Argus Detection**: **CRITICAL RISK (90/100)**
+- **Response**: Explains that UPI deep links with positive amounts debit money from the user instead of crediting funds.
+
+### Scenario 3: Bank Impersonation with Typosquatted Domain
+- **Input Text**: `"URGENT: Your bank account will be locked within 2 hours. Verify your PAN and KYC now at http://hdfc-kyc-verify.xyz/login"`
+- **Argus Detection**: **CRITICAL RISK (92/100)**
+- **Response**: Flags artificial urgency, suspicious `.xyz` TLD, brand spoofing, and credential harvesting triggers.
+
+### Scenario 4: Clean Benign Peer Message
+- **Input Text**: `"Hey, are we still meeting for lunch at 1 PM today?"`
+- **Argus Detection**: **LOW RISK (0/100)**
+- **Response**: Evaluated as benign. No alert is triggered.
+
+---
+
 ## 📡 API Reference
 
 ### Analyze Content: `POST /api/analyze`
 
-#### Request Payload:
-```json
-{
-  "text": "download wedding_card.apk from https://files-host.me/wedding_card.apk",
-  "source": "whatsapp",
-  "sender": "+91 80580 87045",
-  "cloud_analysis": true
-}
+#### Request:
+```bash
+curl -X POST http://localhost:8000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "download wedding_card.apk from https://files-host.me/wedding_card.apk",
+    "source": "whatsapp",
+    "sender": "+91 80580 87045",
+    "cloud_analysis": true
+  }'
 ```
 
 #### Response:
@@ -209,9 +260,9 @@ adb reverse tcp:8000 tcp:8000
 
 ---
 
-## 🧪 Automated Testing & Verification
+## 🔬 Automated Testing Suite
 
-Argus includes a comprehensive test suite of **113 passing tests** covering ML models, API contracts, PII scrubbing, UPI deep links, APK inspectors, and email RFC 822 parsers:
+Argus includes **113 automated unit and integration tests** verifying ML models, URL features, APK inspectors, UPI parsers, PII scrubbing, and API endpoints:
 
 ```bash
 cd threatforge/backend
@@ -223,20 +274,16 @@ pytest -v
 
 ---
 
-## 🛡️ Security, Privacy & Trust Guarantees
+## 🔒 Security, Privacy & Trust Guarantees
 
-1. **Zero Outbound URL Crawling**: URL classification is performed 100% offline using 23 lexical structural features. The system never connects to or visits malicious links.
-2. **Pre-Transmission Redaction**: Private OTPs, session tokens, and credit cards are scrubbed client-side before any network transmission.
-3. **Strict Whitelisting**: The Android listener strictly monitors only WhatsApp and Telegram. Banking notifications, SMS, system alerts, and personal emails are discarded immediately.
-4. **Local-Only Agency**: Users can enable **Local-Only Shield** at any time to run purely on on-device heuristics with zero external cloud connectivity.
-5. **Configurable Data Retention**: Users can configure retention (Memory Only, 24 Hours, 7 Days, 30 Days) and purge cached alerts with a single tap.
+1. **Zero Outbound URL Crawling**: URL analysis is performed 100% offline using 23 structural lexical features. Argus never pings or visits malicious links, avoiding target confirmation.
+2. **Pre-Transmission Redaction**: Private OTPs, verification codes, session tokens, and credit cards are scrubbed client-side before any network transmission.
+3. **Strict Whitelisting**: The Android listener strictly monitors WhatsApp and Telegram. Personal SMS, banking notifications, system alerts, and emails are discarded immediately.
+4. **Local-Only Agency**: Users can enable **Local-Only Shield** at any time to run entirely on on-device heuristics with zero external cloud connectivity.
+5. **Configurable Data Retention**: Users can configure local storage retention (`Memory Only`, `24 Hours`, `7 Days`, `30 Days`) and wipe cached threat history with a single tap.
 
 ---
 
-## 👥 Contributors & Acknowledgements
-
-Developed for hackathons and production cybersecurity prototypes. Built with FastAPI, PyTorch, Hugging Face, Android Jetpack Compose, and React.
-
 <div align="center">
-  <small>© 2026 Argus Cybersecurity. All rights reserved.</small>
+  <small>© 2026 Argus Cybersecurity. Autonomous Cyber Threat Intelligence & Phishing Defense Platform.</small>
 </div>
