@@ -366,7 +366,7 @@ fun ThreatForgeApp() {
                     baseUrl = currentBaseUrl,
                     onBaseUrlChanged = {
                         currentBaseUrl = it
-                        pipeline.apiClient.baseUrl = it
+                        pipeline.setBaseUrl(it)
                     },
                     onClearHistory = {
                         pipeline.clearAlerts()
@@ -2409,7 +2409,15 @@ fun CloudSettingsCard(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        EndpointChip(
+                            label = "Cloud",
+                            selected = baseUrl == com.threatforge.android.network.ThreatForgeApiClient.CLOUD_PROD_BASE_URL,
+                            onClick = { onBaseUrlChanged(com.threatforge.android.network.ThreatForgeApiClient.CLOUD_PROD_BASE_URL) }
+                        )
                         EndpointChip(
                             label = "USB/ADB",
                             selected = baseUrl == com.threatforge.android.network.ThreatForgeApiClient.USB_REVERSE_BASE_URL,
@@ -2420,11 +2428,68 @@ fun CloudSettingsCard(
                             selected = baseUrl == com.threatforge.android.network.ThreatForgeApiClient.LAN_WIFI_BASE_URL,
                             onClick = { onBaseUrlChanged(com.threatforge.android.network.ThreatForgeApiClient.LAN_WIFI_BASE_URL) }
                         )
-                        EndpointChip(
-                            label = "Emulator",
-                            selected = baseUrl == com.threatforge.android.network.ThreatForgeApiClient.EMULATOR_BASE_URL,
-                            onClick = { onBaseUrlChanged(com.threatforge.android.network.ThreatForgeApiClient.EMULATOR_BASE_URL) }
+                    }
+
+                    var customUrlInput by remember(baseUrl) { mutableStateOf(baseUrl) }
+                    var isEditingCustom by remember { mutableStateOf(false) }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (!isEditingCustom) {
+                        Text(
+                            "⚙️ Configure Custom Server URL",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TFColors.AccentCyan,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { isEditingCustom = true }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
                         )
+                    } else {
+                        Column {
+                            OutlinedTextField(
+                                value = customUrlInput,
+                                onValueChange = { customUrlInput = it },
+                                label = { Text("Server Base URL (e.g. https://argus.onrender.com)", fontSize = 10.sp) },
+                                singleLine = true,
+                                textStyle = LocalTextStyle.current.copy(
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TFColors.TextPrimary
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = TFColors.AccentCyan,
+                                    unfocusedBorderColor = TFColors.CardBorder,
+                                    focusedLabelColor = TFColors.AccentCyan,
+                                    unfocusedLabelColor = TFColors.TextMuted
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        val cleanUrl = customUrlInput.trim().trimEnd('/')
+                                        if (cleanUrl.isNotEmpty()) {
+                                            onBaseUrlChanged(cleanUrl)
+                                            isEditingCustom = false
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = TFColors.AccentCyan),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Apply", fontSize = 11.sp, color = TFColors.Background, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = { isEditingCustom = false },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Cancel", fontSize = 11.sp, color = TFColors.TextMuted)
+                                }
+                            }
+                        }
                     }
                 }
             }

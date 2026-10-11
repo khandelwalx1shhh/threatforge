@@ -26,6 +26,7 @@ class ThreatStorageManager(private val context: Context) {
         private const val KEY_RETENTION_DAYS = "retention_days"
         private const val KEY_IGNORED_COUNT = "ignored_count"
         private const val KEY_DEDUPED_COUNT = "deduped_count"
+        private const val KEY_SERVER_URL = "backend_server_url"
         private const val MAX_SAVED_ALERTS = 100
     }
 
@@ -77,6 +78,16 @@ class ThreatStorageManager(private val context: Context) {
 
     fun setRetentionDays(days: Int) {
         prefs.edit().putInt(KEY_RETENTION_DAYS, days).apply()
+    }
+
+    // ── Server URL Configuration ──
+    fun getBaseUrl(): String {
+        return prefs.getString(KEY_SERVER_URL, com.threatforge.android.network.ThreatForgeApiClient.DEFAULT_BASE_URL)
+            ?: com.threatforge.android.network.ThreatForgeApiClient.DEFAULT_BASE_URL
+    }
+
+    fun setBaseUrl(url: String) {
+        prefs.edit().putString(KEY_SERVER_URL, url).apply()
     }
 
     // ── Counters ──

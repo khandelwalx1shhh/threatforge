@@ -54,6 +54,17 @@ class DetectionPipeline(
         storageManager?.getRetentionDays() ?: 7
     ) // 1, 7, 30, or 0 (memory only)
 
+    init {
+        storageManager?.getBaseUrl()?.let { savedUrl ->
+            apiClient.baseUrl = savedUrl
+        }
+    }
+
+    fun setBaseUrl(url: String) {
+        apiClient.baseUrl = url
+        storageManager?.setBaseUrl(url)
+    }
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
