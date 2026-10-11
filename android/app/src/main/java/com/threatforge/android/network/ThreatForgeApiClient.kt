@@ -19,7 +19,7 @@ class ThreatForgeApiClient(
 ) {
 
     companion object {
-        const val CLOUD_PROD_BASE_URL = "https://argus-backend.onrender.com"
+        const val CLOUD_PROD_BASE_URL = "https://sue-waterproof-nyc-january.trycloudflare.com"
         const val EMULATOR_BASE_URL = "http://10.0.2.2:8000"
         const val USB_REVERSE_BASE_URL = "http://127.0.0.1:8000"
         const val LAN_WIFI_BASE_URL = "http://10.21.97.62:8000"
