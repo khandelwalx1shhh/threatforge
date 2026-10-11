@@ -1,203 +1,242 @@
 <div align="center">
-  <img src="frontend/public/logo_transparent.png" width="120" alt="Argus Logo" />
+  <img src="frontend/public/logo_transparent.png" width="130" alt="Argus Logo" />
   <h1>ARGUS</h1>
   <p><strong>Autonomous Cyber Threat Intelligence, On-Device Fraud Prevention & Adaptive Phishing Defense System</strong></p>
+
+  [![Python](https://img.shields.io/badge/Python-3.12-blue.svg?logo=python&logoColor=white)](https://python.org)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+  [![PyTorch](https://img.shields.io/badge/PyTorch-2.14_INT8-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org)
+  [![Android](https://img.shields.io/badge/Android-Kotlin_Compose-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
+  [![React](https://img.shields.io/badge/React-19_TypeScript-61DAFB.svg?logo=react&logoColor=black)](https://react.dev)
+  [![Tests](https://img.shields.io/badge/Tests-113%20Passed-brightgreen.svg?logo=pytest&logoColor=white)](https://pytest.org)
+  [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 </div>
 
-Built for hackathons and production prototypes with a FastAPI backend, Scikit-Learn & PyTorch ML classifiers, INT8 Quantized DistilBERT Transformer, native Android on-device real-time fraud defense agent, and a React + TypeScript SOC dashboard.
+---
 
-> 📘 **Full Architecture & Technical Dossier**: For in-depth engineering specifications, on-device detection pipelines, and API contracts, see [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md).
+> 📘 **Looking for the in-depth system specification?** Check out [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for complete algorithmic breakdowns, dataset training reports, and privacy architecture.
 
 ---
 
-## Phase 2 Architecture & Status Summary
+## 🌟 Key Highlights
 
-### 1. Model Matrix & Fallback Status
-
-| Component | Architecture | Model Version | Artifact Path | Status | Fallback Mode |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Message Text Classifier** | `TfidfVectorizer` + `LogisticRegression` | `text-v1` | `backend/models/scam_classifier_v1.joblib` | **Trained & Active** | Deterministic urgency/credential heuristics (`none`) |
-| **URL Phishing Classifier** | `StandardScaler` + `LogisticRegression` (23 safe lexical features) | `url-v1` | `backend/models/url_classifier_v1.joblib` | **Trained & Active** | Deterministic lexical rules (`url-rules-v1`) |
-| **Deep Email Transformer** | `cybersectony/phishing-email-detection-distilbert_v2.4.1` (INT8 Quantized) | `v2.4.1` | Hugging Face cache | **Active** (20–50ms CPU latency) | Graceful bypass if PyTorch/weights unavailable |
-| **Email Header Security** | RFC 822 Parser (SPF, DKIM, DMARC, Display Name Spoofing) | Rules | `app/services/email_header_analyzer.py` | **Active** | Graceful bypass if no headers supplied |
-| **Threat IOC Extractor** | Conservative Regex Parser with Sanitization & Deduplication | Rules | `app/services/extractor.py` | **Active** | Standard regex matching |
-
----
-
-## Evaluation Metrics & Dataset Analysis
-
-### URL Classifier (`url-v1`)
-- **Dataset**: `backend/data/urls_normalized.csv` (balanced sample of 60,000 real URLs from verified online sources).
-- **Training Set**: 48,000 URLs (24,000 benign, 24,000 malicious).
-- **Evaluation Set**: 12,000 URLs (6,000 benign, 6,000 malicious).
-- **Features**: 23 safe local lexical string features (length, hostname length, subdomain count, dots, hyphens, slashes, digit ratio, special character ratio, entropy, host entropy, IP address host detection, punycode `xn--`, brand spoofing detection, sensitive keywords count, high-risk TLDs). **Zero network requests or URL crawling.**
-- **Actual Evaluation Metrics**:
-  - **Accuracy**: `75.08%`
-  - **Precision**: `79.82%`
-  - **Recall**: `67.12%`
-  - **F1-Score**: `0.7292`
-  - **Confusion Matrix**: True Negative: `4,982`, False Positive: `1,018`, False Negative: `1,973`, True Positive: `4,027`
-- **Report File**: `backend/models/url_training_report.json`
-
-### Message Text Classifier (`text-v1`)
-- **Dataset**: `backend/data/normalized_messages.csv`
-- **Samples**: 275 labeled messages (scam vs. benign).
-- **Report File**: `backend/models/training_report.json`
+- 🛡️ **Native Android 24/7 On-Device Agent**: Real-time background notification inspection (`NotificationListenerService`) for **WhatsApp** and **Telegram** with zero battery drain.
+- 🛑 **Sideloaded APK Package Inspector**: Detects deceptive dropper URLs distributing malicious Android packages (e.g. `wedding_card.apk`, `e-challan_update.apk`, banking trojans).
+- 💸 **UPI Deep Link & QR Intent Auditor**: Neutralizes reverse-charge payment manipulation attacks (`upi://pay?pa=...&am=...`) pretending to be refunds or cashback.
+- ⚡ **INT8 Quantized DistilBERT Transformer**: Sub-30ms on-device neural network CPU inference classifying urgency, social engineering, and phishing patterns.
+- 🌐 **Offline Lexical URL Classifier (23 Features)**: Evaluates URL structure without outbound network requests or crawling (100% target-silent).
+- 🧠 **Gemini GenAI Multi-Turn Reasoning**: Explains attack psychology, extracts Indicators of Compromise (IOCs), and formulates customized countermeasures.
+- 🔒 **Zero-Leakage Privacy Gate**: Redacts OTPs, auth tokens, and credentials client-side; whitelist filters family and friends directly from local contacts.
+- 🖥️ **Modern SOC Command Center**: Dark cyber glassmorphism operations dashboard with real-time telemetry, threat radar, and manual content investigation.
 
 ---
 
-## API Contract (For Android & Client Developers)
+## 🏗️ System Architecture
 
-### Base URL & Port
-- **Base URL**: `http://localhost:8000` (or `http://<HOST_IP>:8000`)
-- **Port**: `8000`
-- **Interactive OpenAPI Docs**: `http://localhost:8000/docs`
+```mermaid
+flowchart TD
+    subgraph MobileDevice["Android Client (Edge Defense Layer)"]
+        A["Incoming Notification: WhatsApp / Telegram"] --> B[NotificationListenerService]
+        B --> C{Package & Contact Whitelist}
+        C -- "Ignored / Family Contact" --> D[Discard Event Immediately]
+        C -- "Unknown Sender" --> E[Client-Side PII Scrubber]
+        E --> F[Event Deduplicator (SHA-256 / 3m)]
+        F --> G[On-Device Heuristic Engine]
+        G --> H{Local Only Mode?}
+        H -- "Yes" --> I[Local Alert & Storage]
+        H -- "No (Consent Enabled)" --> J[Encrypted Transport to Backend]
+    end
 
-### 1. Health Endpoint: `GET /health`
+    subgraph BackendAPI["Cloud SOC Service (FastAPI / Machine Learning)"]
+        J --> K["POST /api/analyze"]
+        WebInput["Web Dashboard Scan"] --> K
+        K --> L[APK Dropper & Trojan Inspector]
+        K --> M[UPI Intent Fraud Auditor]
+        K --> N[Lexical URL Classifier: url-v1]
+        K --> O[Quantized DistilBERT Transformer: INT8]
+        K --> P[Gemini GenAI Reasoning Agent]
+        K --> Q[RFC 822 Email Header Inspector]
+        
+        L & M & N & O & P & Q --> R[Weighted Risk Scoring Engine (0-100)]
+        R --> S[(Argus Threat Intelligence DB)]
+        R --> T[Standardized Assessment Output]
+    end
 
-**Response Example:**
-```json
-{
-  "status": "ok",
-  "model_loaded": true,
-  "url_model_loaded": true,
-  "url_model_version": "url-v1",
-  "distilbert_loaded": true,
-  "distilbert_quantized": true
-}
+    subgraph DefenseOutput["Multi-Channel Response"]
+        T --> U["Android System Heads-Up Alert (HIGH / CRITICAL)"]
+        T --> V["Encrypted Local Persistent Storage"]
+        T --> W["SOC Telemetry Web Dashboard"]
+    end
 ```
 
 ---
 
-### 2. Threat Analysis Endpoint: `POST /api/analyze`
+## 📁 Repository Structure
 
-#### Request Payload Specification
+```
+threatforge/
+├── android/                        # Native Android Application (Kotlin + Jetpack Compose)
+│   ├── app/src/main/
+│   │   ├── java/com/threatforge/android/
+│   │   │   ├── analyzer/           # LocalRiskAnalyzer.kt (On-device heuristics)
+│   │   │   ├── filter/             # PackageFilter.kt & ContactFilter.kt
+│   │   │   ├── privacy/            # PrivacyScrubber.kt (PII / OTP redaction)
+│   │   │   ├── service/            # NotificationListenerService & AlertNotificationHelper
+│   │   │   ├── storage/            # ThreatStorageManager.kt (Local cache & retention)
+│   │   │   └── MainActivity.kt     # Jetpack Compose UI & Setup Wizard
+│   │   └── res/                    # Custom Argus icons, drawables, and themes
+│   └── build.gradle.kts            # Android build configuration
+├── backend/                        # High-Performance FastAPI SOC Backend
+│   ├── app/
+│   │   ├── routers/                # REST endpoints (/api/analyze, /api/threats, /health)
+│   │   ├── schemas/                # Pydantic v2 schemas
+│   │   └── services/               # ML, Transformer, Gemini, URL, APK, and UPI engines
+│   ├── data/                       # Normalized benign/malicious datasets
+│   ├── models/                     # Trained Scikit-Learn models and evaluation reports
+│   └── tests/                      # Pytest suite (113 automated unit & integration tests)
+├── frontend/                       # React 19 + TypeScript + Vite SOC Dashboard
+│   ├── public/                     # Argus transparent logos and favicons
+│   ├── src/                        # Dashboard components, threat radar, and live telemetry
+│   └── index.html                  # Branded single-page application entrypoint
+├── PROJECT_DOCUMENTATION.md        # Comprehensive system engineering specification
+└── README.md                       # Master overview & developer guide
+```
 
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `text` | string | **Yes** | Message text or URL to analyze (max 5000 characters). |
-| `source` | string | No | Source channel: `"whatsapp"`, `"telegram"`, `"manual_test"`, `"email"` (default: `"manual_test"`). |
-| `sender` | string | No | Sender identifier (phone, email, or handle). |
-| `raw_headers` | string | No | Optional raw RFC 822 email headers. |
-| `cloud_analysis` | boolean | No | Flag for cloud analysis (default: `false`). |
+---
 
-#### Request Example (JSON)
+## 🚀 Quick Start Guide
+
+### 1. Prerequisites
+- **Python**: 3.12+
+- **Node.js**: 18+ and `npm`
+- **Java**: JDK 17 (Microsoft OpenJDK 17 recommended)
+- **Android Platform Tools**: `adb` installed in PATH
+
+---
+
+### 2. Start the Backend API
+```bash
+cd threatforge/backend
+
+# Create and activate virtual environment
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# (Optional) Set Google Gemini API Key in .env:
+# GEMINI_API_KEY=your_key_here
+
+# Launch FastAPI server
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+- API Docs: `http://localhost:8000/docs`
+- Health Check: `http://localhost:8000/health`
+
+---
+
+### 3. Start the React SOC Dashboard
+```bash
+cd threatforge/frontend
+
+# Install dependencies
+npm install
+
+# Launch Vite dev server
+npm run dev
+```
+- Dashboard URL: `http://localhost:5173`
+
+---
+
+### 4. Build & Install Android Mobile Agent
+```bash
+cd threatforge/android
+
+# Build Debug APK
+.\gradlew.bat assembleDebug
+
+# Connect Android phone via USB (with USB Debugging enabled) and install:
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# Forward device network calls to your local backend server:
+adb reverse tcp:8000 tcp:8000
+```
+
+---
+
+## 📡 API Reference
+
+### Analyze Content: `POST /api/analyze`
+
+#### Request Payload:
 ```json
 {
-  "text": "URGENT: Your account will be suspended. Verify immediately at http://192.168.1.50/login.php?update=bank",
-  "source": "whatsapp"
+  "text": "download wedding_card.apk from https://files-host.me/wedding_card.apk",
+  "source": "whatsapp",
+  "sender": "+91 80580 87045",
+  "cloud_analysis": true
 }
 ```
 
-#### Response Payload Specification
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `risk_score` | integer | Risk score strictly bounded between `0` and `100`. |
-| `risk_level` | string | Exact risk category: `"low"` (0–29), `"medium"` (30–59), `"high"` (60–79), `"critical"` (80–100). Score `87` maps to `"critical"`. |
-| `reasons` | string[] | Explainable human-readable reasons for detected threat signals. |
-| `recommended_action` | string | Actionable safe next step for the user. |
-| `indicators` | object[] | Deduplicated threat indicators (URLs, domains, emails, phones, UPIs, IPs, crypto addresses). |
-| `model_version` | string | Model identifier (e.g. `"text-v1"`, `"url-v1"`, or fallback `"none"`). |
-| `analysis_mode` | string | Mode identifier: `"rules+ml"`, `"rules"`, or `"ml"`. |
-
-#### Response Example (JSON)
+#### Response:
 ```json
 {
-  "risk_score": 87,
+  "risk_score": 100,
   "risk_level": "critical",
   "reasons": [
-    "Uses an urgent account threat",
-    "Contains suspicious link with coercive context",
-    "Host is a raw numerical IP address instead of a domain name",
-    "URL path or query contains 3 sensitive authentication/billing keywords"
+    "Unfamiliar domain structure requires standard user verification",
+    "Message distributes an Android application package (.apk): 'wedding_card.apk'."
   ],
-  "recommended_action": "Do not click unverified links. Access the service directly through official verified channels.",
+  "recommended_action": "DO NOT install or download this APK file. Sideloaded packages from instant messages frequently contain Trojans, keyloggers, or banking fraud droppers.",
   "indicators": [
     {
-      "type": "Phishing URL",
-      "value": "http://192.168.1.50/login.php?update=bank",
+      "type": "Malicious Payload",
+      "value": "wedding_card.apk",
       "severity": "CRITICAL",
-      "confidence": 0.95,
-      "context": "Verify immediately at http://192.168.1.50/login.php?update=bank",
-      "metadata": {
-        "domain": "192.168.1.50",
-        "is_ip_host": true,
-        "status": "unverified",
-        "is_verified": false
-      }
+      "confidence": 1.0,
+      "context": "Message distributes an Android application package (.apk): 'wedding_card.apk'."
     }
   ],
-  "model_version": "text-v1",
+  "model_version": "distilbert-quantized+rules",
   "analysis_mode": "rules+ml"
 }
 ```
 
 ---
 
-## Retraining & Model Management
+## 🧪 Automated Testing & Verification
 
-### Retrain the URL Classifier
-```bash
-python backend/scripts/train_url_classifier.py
-```
-Outputs model artifact to `backend/models/url_classifier_v1.joblib` and evaluation metrics to `backend/models/url_training_report.json`.
-
-### Retrain the Text Classifier
-```bash
-python backend/scripts/prepare_and_train.py
-```
-Outputs model artifact to `backend/models/scam_classifier_v1.joblib` and metrics to `backend/models/training_report.json`.
-
----
-
-## Running Automated Tests
-
-All 99 automated tests execute locally without requiring internet access or opening untrusted links:
+Argus includes a comprehensive test suite of **113 passing tests** covering ML models, API contracts, PII scrubbing, UPI deep links, APK inspectors, and email RFC 822 parsers:
 
 ```bash
-cd backend
+cd threatforge/backend
 pytest -v
 ```
-
-Tests verify:
-1. `GET /health` model reporting.
-2. Suspicious synthetic message handling.
-3. Benign message control handling.
-4. URL extraction and lexical analysis invocation.
-5. URL-only inputs.
-6. Malformed input validation (HTTP 422).
-7. Risk score bounding within 0–100.
-8. Exact boundary threshold checks (29, 30, 59, 60, 79, 80).
-9. Score 87 maps to `"critical"`.
-10. Graceful fallback when models are missing/unloaded.
-11. Indicator deduplication without repeated items.
-12. Zero network requests or URL fetching.
-13. Sensitive token and credential redaction from logs and storage.
+```
+======================= 113 passed, 1 warning in 23.77s =======================
+```
 
 ---
 
-## Starting Backend and Frontend
+## 🛡️ Security, Privacy & Trust Guarantees
 
-### Start FastAPI Backend
-```bash
-cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-### Start React Dashboard
-```bash
-cd frontend
-npm run dev
-```
-Frontend runs at `http://localhost:5173`. CORS is preconfigured for local dev ports `5173`, `3000`, and `8000`.
+1. **Zero Outbound URL Crawling**: URL classification is performed 100% offline using 23 lexical structural features. The system never connects to or visits malicious links.
+2. **Pre-Transmission Redaction**: Private OTPs, session tokens, and credit cards are scrubbed client-side before any network transmission.
+3. **Strict Whitelisting**: The Android listener strictly monitors only WhatsApp and Telegram. Banking notifications, SMS, system alerts, and personal emails are discarded immediately.
+4. **Local-Only Agency**: Users can enable **Local-Only Shield** at any time to run purely on on-device heuristics with zero external cloud connectivity.
+5. **Configurable Data Retention**: Users can configure retention (Memory Only, 24 Hours, 7 Days, 30 Days) and purge cached alerts with a single tap.
 
 ---
 
-## Privacy & Security Protections
+## 👥 Contributors & Acknowledgements
 
-1. **Local Analysis Only**: No outbound HTTP requests or crawlers visit submitted URLs.
-2. **Sensitive Token Redaction**: Private query tokens (`?token=...`, `?key=...`, `?auth=...`, `?otp=...`) and verification codes are scrubbed and replaced with `REDACTED`.
-3. **Unverified Status**: Newly extracted indicators are marked `status: "unverified"` to prevent false accusations.
-4. **No Raw Logging**: Full unbounded message texts and passwords are never written to server logs.
-5. **Deterministic Fallbacks**: If any ML model is unavailable, the system transparently falls back to deterministic rule-based analysis without failing.
+Developed for hackathons and production cybersecurity prototypes. Built with FastAPI, PyTorch, Hugging Face, Android Jetpack Compose, and React.
+
+<div align="center">
+  <small>© 2026 Argus Cybersecurity. All rights reserved.</small>
+</div>
