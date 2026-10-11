@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
 from app.services.analyzer import analyze_scam_risk
+from app.services.extractor import sanitize_snippet
 from app.models import AnalysisReport, ThreatLog
 
 router = APIRouter(prefix="/api", tags=["Threat Analysis"])
@@ -12,7 +13,7 @@ def analyze_threat(payload: AnalyzeRequest, db: Session = Depends(get_db)):
     """
     POST /api/analyze
     Analyzes suspicious text/message for scam risk scoring, reasons, and recommended action.
-    Combines trained ML classifier and explainable deterministic rules.
+    Combines trained ML classifier, URL model, and explainable deterministic rules.
     Persists analysis report and logs extracted threat indicators into database.
     """
     text_to_analyze = payload.text or payload.message
@@ -31,10 +32,14 @@ def analyze_threat(payload: AnalyzeRequest, db: Session = Depends(get_db)):
         headers=payload.headers
     )
 
-    # Persist report to database
+    # Persist report to database (strictly sanitized preview with sender pseudonymized; zero raw message logging)
+    import re
+    sanitized_preview = sanitize_snippet(text_to_analyze[:300])
+    sender_masked = re.sub(r'(\d{2})\d{4,}(\d{2})', r'\1*****\2', payload.sender) if payload.sender else None
+
     report = AnalysisReport(
-        message=text_to_analyze,
-        sender=payload.sender,
+        message=sanitized_preview,
+        sender=sender_masked,
         risk_score=float(result.risk_score),
         risk_level=result.risk_level,
         summary=result.summary or f"{result.risk_level.upper()} RISK ({result.risk_score}/100)",

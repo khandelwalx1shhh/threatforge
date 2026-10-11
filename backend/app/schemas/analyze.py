@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import List, Optional, Dict, Any
 from app.schemas.common import ExtractedIndicator, RiskBreakdownFactor
 from app.services.email_header_analyzer import EmailHeaderAnalysisResult
+from app.services.payload_scanner import UpiAuditResult, ApkAuditResult
 
 class AnalyzeRequest(BaseModel):
     text: Optional[str] = Field(default=None, max_length=5000, description="Message text or full email to analyze for scam/fraud risk")
@@ -19,14 +20,20 @@ class AnalyzeRequest(BaseModel):
         if not isinstance(data, dict):
             return data
 
-        # Validate source
-        src = data.get("source", "manual_test")
+        # Validate and normalize source
+        src = data.get("source")
         if src is not None:
-            valid_sources = {"whatsapp", "telegram", "manual_test", "email"}
             src_str = str(src).lower().strip()
-            if src_str not in valid_sources:
-                raise ValueError(f"Invalid source '{src}'. Supported sources: whatsapp, telegram, manual_test, email")
-            data["source"] = src_str
+            if "whatsapp" in src_str:
+                data["source"] = "whatsapp"
+            elif "telegram" in src_str:
+                data["source"] = "telegram"
+            elif src_str in {"email", "sms", "manual_test", "web", "honeypot"}:
+                data["source"] = src_str
+            else:
+                raise ValueError(f"Unsupported source channel '{src}'. Allowed sources: whatsapp, telegram, email, sms, manual_test.")
+        else:
+            data["source"] = "manual_test"
 
         # Validate text or message
         raw_text = data.get("text")
@@ -87,3 +94,33 @@ class AnalyzeResponse(BaseModel):
 
     # Dedicated Email Header Security & Authentication Audit
     header_analysis: Optional[EmailHeaderAnalysisResult] = Field(default=None, description="Email header authentication and spoofing analysis")
+
+    # Privacy & Trust Verification
+    privacy_guarantees: Optional[Dict[str, Any]] = Field(
+        default_factory=lambda: {
+            "zero_web_crawling": True,
+            "pre_transmission_sanitization": True,
+            "raw_message_logging_disabled": True,
+            "data_retention_days": 7
+        },
+        description="Transparent privacy and trust guarantees for data processing"
+    )
+
+    # Gemini AI Threat Intelligence
+    gemini_analysis: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Advanced GenAI threat assessment powered by Google Gemini (active when GEMINI_API_KEY is configured and cloud consent granted)"
+    )
+
+    # UPI Deep Link & QR Code Audit
+    upi_audit: Optional[UpiAuditResult] = Field(
+        default=None,
+        description="Static audit of UPI payment intents, reverse-charge traps, and payee spoofing"
+    )
+
+    # Malicious APK Dropper Audit
+    apk_audit: Optional[ApkAuditResult] = Field(
+        default=None,
+        description="Static inspection of sideloaded Android APK packages and trojan lures"
+    )
+

@@ -12,6 +12,9 @@ from app.services.email_header_analyzer import (
     detect_raw_email_headers,
     EmailHeaderAnalysisResult
 )
+from app.services.url_analyzer import url_classifier_service
+from app.services.gemini_detector import gemini_detector
+from app.services.payload_scanner import payload_scanner
 
 # Keyword & Pattern Matching Rules
 URGENCY_PATTERNS = re.compile(
@@ -63,6 +66,16 @@ def determine_risk_level(score: int) -> str:
     else:
         return "low"
 
+def is_input_primarily_url(text: str) -> bool:
+    clean = text.strip()
+    # Check if text is just a URL or starts with http/www without many extra words
+    if re.match(r'^(?:https?://|www\.)[^\s]+$', clean, re.IGNORECASE):
+        return True
+    words = clean.split()
+    if len(words) <= 3 and any(w.lower().startswith(("http://", "https://", "www.")) for w in words):
+        return True
+    return False
+
 def analyze_scam_risk(
     message: str,
     sender: Optional[str] = None,
@@ -72,8 +85,8 @@ def analyze_scam_risk(
     headers: Optional[Dict[str, str]] = None
 ) -> AnalyzeResponse:
     """
-    Analyzes message for scam/fraud risk using hybrid ML classifier + explainable deterministic rules
-    + DistilBERT phishing transformer + dedicated RFC 822 Email Header security audit.
+    Analyzes message for scam/fraud risk using hybrid ML classifier + lexical URL model
+    + explainable deterministic rules + DistilBERT phishing transformer + dedicated RFC 822 Email Header security audit.
     Gracefully falls back to rules-only mode if ML models are not loaded.
     """
     clean_text = (message or "").strip()
@@ -84,8 +97,8 @@ def analyze_scam_risk(
             reasons=[],
             recommended_action="No action required.",
             indicators=[],
-            model_version=model_manager.model_version if model_manager.is_loaded else "none",
-            analysis_mode="rules+ml" if model_manager.is_loaded else "rules",
+            model_version=model_manager.model_version if model_manager.is_loaded else "rules-fallback",
+            analysis_mode="rules",
             summary="Empty input. No risk indicators detected.",
             breakdown=[],
             recommendations=["No action required."],
@@ -108,7 +121,6 @@ def analyze_scam_risk(
     target_body = clean_text
     header_res: Optional[EmailHeaderAnalysisResult] = None
 
-    # Check if raw headers were explicitly passed or embedded at beginning of text
     effective_raw_headers = raw_headers
     if not effective_raw_headers and not headers:
         detected_h, detected_b = detect_raw_email_headers(clean_text)
@@ -126,7 +138,44 @@ def analyze_scam_risk(
     # 2. Extract IOCs from the body (or full text)
     indicators: List[ExtractedIndicator] = extract_indicators(target_body)
 
-    # 3. Evaluate Rule Signals
+    # 3. URL Analysis via URL Classifier Service
+    url_results: List[Dict[str, Any]] = []
+    max_url_score = 0
+    highest_risk_url_result: Optional[Dict[str, Any]] = None
+
+    url_indicators = [i for i in indicators if i.type in ("Phishing URL", "Suspicious URL")]
+    for u_ind in url_indicators:
+        analysis = url_classifier_service.analyze_url(u_ind.value)
+        url_results.append(analysis)
+        u_score = analysis.get("risk_score", 0)
+        if u_score > max_url_score:
+            max_url_score = u_score
+            highest_risk_url_result = analysis
+        
+        # Update indicator severity and metadata with URL model insights
+        if u_score >= 80:
+            u_ind.severity = SeverityEnum.CRITICAL
+            u_ind.type = "Phishing URL"
+        elif u_score >= 60:
+            u_ind.severity = SeverityEnum.HIGH
+            u_ind.type = "Phishing URL"
+        elif u_score >= 30:
+            u_ind.severity = SeverityEnum.MEDIUM
+            u_ind.type = "Suspicious URL"
+        else:
+            u_ind.severity = SeverityEnum.LOW
+            u_ind.type = "Phishing URL" if u_ind.metadata.get("suspicious_tld") else "Suspicious URL"
+        
+        if analysis.get("ml_probability") is not None:
+            u_ind.confidence = round(analysis["ml_probability"], 2)
+        if analysis.get("features"):
+            u_ind.metadata.update({
+                "entropy": round(analysis["features"].get("entropy", 0), 2),
+                "is_ip_host": bool(analysis["features"].get("is_ip_host")),
+                "brand_spoofing": bool(analysis["features"].get("brand_spoofing_count", 0) > 0)
+            })
+
+    # 4. Evaluate Rule Signals
     rule_score = 0
     reasons: List[str] = []
     breakdown: List[RiskBreakdownFactor] = []
@@ -237,33 +286,57 @@ def analyze_scam_risk(
             evidence=evidence_str
         ))
 
-    # Signal E: Suspicious links combined with urgency or credential requests
-    urls = [i for i in indicators if i.type == "Phishing URL"]
-    if urls:
-        if otp_matches or urgency_matches or payment_matches:
-            rule_score += 25
-            reasons.append("Contains suspicious link with coercive context")
+    # Signal E: URL Classifier Signals (Integrated Text + URL analysis)
+    if highest_risk_url_result:
+        u_score = highest_risk_url_result["risk_score"]
+        u_reasons = highest_risk_url_result.get("reasons", [])
+        
+        # Deduplicate reasons from URL analysis
+        for r in u_reasons:
+            if r not in reasons and "standard benign" not in r:
+                reasons.append(r)
+
+        if u_score >= 60:
+            # Phishing or highly suspicious URL
+            if otp_matches or urgency_matches or payment_matches:
+                rule_score += 25
+                if "Contains suspicious link with coercive context" not in reasons:
+                    reasons.append("Contains suspicious link with coercive context")
+                breakdown.append(RiskBreakdownFactor(
+                    code="SUSPICIOUS_LINK_COERCION",
+                    label="Suspicious Link with Threat",
+                    factor="Suspicious Links & Phishing URL",
+                    score=25.0,
+                    description=f"Directs to unverified link '{highest_risk_url_result['url']}' combined with urgent or credential demands.",
+                    severity=SeverityEnum.CRITICAL,
+                    evidence=highest_risk_url_result['url']
+                ))
+            else:
+                rule_score += 30
+                breakdown.append(RiskBreakdownFactor(
+                    code="MALICIOUS_URL_SIGNAL",
+                    label="Suspicious / Phishing URL Detected",
+                    factor="URL Threat Classifier",
+                    score=30.0,
+                    description=f"URL classifier identified high phishing risk on '{highest_risk_url_result['url']}'.",
+                    severity=SeverityEnum.HIGH,
+                    evidence=highest_risk_url_result['url']
+                ))
+        elif u_score >= 30:
+            # Moderate / uncertain URL
+            rule_score += 15
             breakdown.append(RiskBreakdownFactor(
-                code="SUSPICIOUS_LINK_COERCION",
-                label="Suspicious Link with Threat",
-                factor="Suspicious Links & Phishing URL",
-                score=25.0,
-                description=f"Directs to unverified link '{urls[0].value}' combined with urgent or credential demands.",
-                severity=SeverityEnum.CRITICAL,
-                evidence=urls[0].value
+                code="UNCERTAIN_URL_SIGNAL",
+                label="Unfamiliar or Unverified Link",
+                factor="URL Threat Classifier",
+                score=15.0,
+                description=f"URL '{highest_risk_url_result['url']}' is unfamiliar or has moderate lexical anomalies.",
+                severity=SeverityEnum.MEDIUM,
+                evidence=highest_risk_url_result['url']
             ))
         else:
-            # Standalone URL without urgency or credential harvesting
-            rule_score += 10
-            breakdown.append(RiskBreakdownFactor(
-                code="EXTERNAL_LINK",
-                label="External URL Detected",
-                factor="External URL Presence",
-                score=10.0,
-                description=f"Contains external web link '{urls[0].value}'.",
-                severity=SeverityEnum.LOW,
-                evidence=urls[0].value
-            ))
+            # Benign URL: No rule score penalty.
+            pass
 
     # Signal F: Impersonation of Authority
     impersonation_matches = IMPERSONATION_PATTERNS.findall(target_body)
@@ -297,7 +370,41 @@ def analyze_scam_risk(
             evidence=evidence_str
         ))
 
-    # 4. DistilBERT Phishing Transformer Inference
+    # Signal H: UPI Deep Link & QR Code Audit
+    upi_audit = payload_scanner.audit_upi_payload(target_body)
+    if upi_audit:
+        rule_score += upi_audit.risk_boost
+        for a in upi_audit.anomalies:
+            if a not in reasons:
+                reasons.append(a)
+        breakdown.append(RiskBreakdownFactor(
+            code="UPI_DEEPLINK_RISK",
+            label="UPI Deep Link Deception",
+            factor="UPI Payment Intent",
+            score=float(upi_audit.risk_boost),
+            description=upi_audit.anomalies[0] if upi_audit.anomalies else f"Contains direct UPI payment URI targeting {upi_audit.payee_vpa}.",
+            severity=SeverityEnum.CRITICAL if upi_audit.risk_boost >= 60 else SeverityEnum.HIGH,
+            evidence=upi_audit.payee_vpa or upi_audit.raw_uri or "upi://pay"
+        ))
+
+    # Signal I: Malicious Sideloaded APK Package Dropper
+    apk_audit = payload_scanner.audit_apk_threat(target_body)
+    if apk_audit:
+        rule_score += 65
+        for r in apk_audit.reasons[:2]:
+            if r not in reasons:
+                reasons.append(r)
+        breakdown.append(RiskBreakdownFactor(
+            code="MALICIOUS_APK_DROPPER",
+            label="Sideloaded APK Package",
+            factor="Android Malware Dropper",
+            score=45.0,
+            description=f"Identified {apk_audit.lure_category} distributing '{apk_audit.filename}' ({apk_audit.targeted_threat_family}).",
+            severity=SeverityEnum.CRITICAL,
+            evidence=apk_audit.filename or ".apk dropper"
+        ))
+
+    # 5. DistilBERT Phishing Transformer Inference
     distil_pred = distilbert_detector.predict(target_body)
     if distil_pred.is_available and distil_pred.predicted_class_index in {1, 3} and distil_pred.confidence >= 0.70:
         distil_reason = f"Flagged by DistilBERT model ({distil_pred.candidate_class_label}, confidence: {distil_pred.confidence:.1%})"
@@ -318,45 +425,98 @@ def analyze_scam_risk(
         ))
         rule_score += 25
 
-    # 5. Baseline Scikit-Learn Model Inference & Hybrid Blending
+    # 6. Baseline Scikit-Learn Text Model Inference & Hybrid Blending
     ml_prob = model_manager.predict_scam_probability(target_body)
 
-    if model_manager.is_loaded and ml_prob is not None:
-        model_version = model_manager.model_version
-        if len(reasons) > 0:
-            analysis_mode = "rules+ml"
-            # Blend rule score with ML confirmation
+    # Determine analysis mode and model version based on whether text ML or URL ML was active
+    text_model_loaded = model_manager.is_loaded
+    url_model_used = len(url_results) > 0 and url_classifier_service.is_available()
+
+    if text_model_loaded and url_model_used:
+        effective_model_version = model_manager.model_version
+        effective_analysis_mode = "rules+ml"
+    elif text_model_loaded:
+        effective_model_version = model_manager.model_version
+        effective_analysis_mode = "rules+ml"
+    elif url_model_used:
+        effective_model_version = url_classifier_service.model_version
+        effective_analysis_mode = "rules+ml"
+    else:
+        effective_model_version = "none"
+        effective_analysis_mode = "rules"
+
+    # Hybrid Score Blending
+    if text_model_loaded and ml_prob is not None:
+        if len(reasons) > 0 or max_url_score >= 30:
             blended_score = rule_score + int(round(ml_prob * 15))
         else:
-            # No rules triggered
             if ml_prob >= 0.70:
-                analysis_mode = "ml"
                 reasons.append("Flagged by text classification model")
                 blended_score = int(round(ml_prob * 100))
+                effective_analysis_mode = "ml"
             else:
-                analysis_mode = "rules+ml"
-                blended_score = 0  # Benign message confirmed by both rules and model
+                blended_score = 0  # Benign message confirmed by rules, URL, and model
     else:
-        # Graceful fallback when baseline model is missing or fails
-        model_version = "none"
-        analysis_mode = "rules"
         blended_score = rule_score
+
+    # Check for direct URL-only or URL-dominant input
+    if is_input_primarily_url(target_body) and highest_risk_url_result:
+        # For URL-dominant input, preserve the URL model's assessment directly
+        u_score = highest_risk_url_result["risk_score"]
+        blended_score = max(blended_score, u_score)
+
+    # 6b. Cloud AI Detection via Google Gemini (active when cloud_analysis=True and GEMINI_API_KEY is configured)
+    gemini_result = None
+    if cloud_analysis and gemini_detector.is_available:
+        gemini_result = gemini_detector.analyze(target_body)
+        if gemini_result:
+            effective_analysis_mode = "hybrid+gemini"
+            g_score = gemini_result.get("risk_score", 0)
+            if g_score > blended_score:
+                blended_score = int(round((blended_score * 0.3) + (g_score * 0.7)))
+
+            for r in gemini_result.get("reasons", []):
+                if r not in reasons:
+                    reasons.append(r)
+
+            g_level = determine_risk_level(g_score).upper()
+            breakdown.append(RiskBreakdownFactor(
+                code="GEMINI_AI_REASONING",
+                label="Gemini Threat Analysis",
+                factor="Generative AI Intent Analysis",
+                score=float(g_score),
+                description=gemini_result.get("summary") or f"Gemini classified intent: {gemini_result.get('intent_category')}",
+                severity=SeverityEnum(g_level) if g_level in SeverityEnum.__members__ else SeverityEnum.MEDIUM,
+                evidence=", ".join(gemini_result.get("psychological_tactics", [])) or "Gemini LLM Reasoning"
+            ))
 
     # Final score bounded to integer 0–100
     final_score = max(0, min(100, int(round(blended_score))))
 
-    # Exact score bands
+    # Exact score bands:
+    # 0–29: low
+    # 30–59: medium
+    # 60–79: high
+    # 80–100: critical
     risk_level = determine_risk_level(final_score)
 
-    # 6. Safe Recommended Action
-    if otp_matches:
+    # 7. Safe Recommended Action
+    if apk_audit:
+        recommended_action = "CRITICAL: Do NOT download or install this .apk file. It is a trojanized spyware or banking stealer."
+    elif upi_audit and upi_audit.is_reverse_charge_lure:
+        recommended_action = "Do NOT approve this UPI transaction. UPI pay links debit your account, they cannot receive or refund money."
+    elif otp_matches:
         recommended_action = "Do not share your OTP. Verify through your bank's official app."
     elif header_res and (header_res.display_name_spoofing or not header_res.domain_alignment):
         recommended_action = "Sender address and headers are spoofed. Do not open attachments or reply."
-    elif urls and urgency_matches:
+    elif max_url_score >= 60 and urgency_matches:
         recommended_action = "Do not click unverified links. Access the service directly through official verified channels."
+    elif max_url_score >= 60:
+        recommended_action = "Do not click unverified links. Inspect the domain and navigate to official verified sites directly."
     elif payment_matches or has_bank_or_upi:
         recommended_action = "Do not transfer money or initiate UPI payments to unverified accounts."
+    elif final_score >= 80:
+        recommended_action = "Critical risk detected. Do not interact with the sender, click links, or provide information."
     elif final_score >= 60:
         recommended_action = "Treat this message with high caution. Independently verify the sender's identity."
     elif final_score >= 30:
@@ -364,7 +524,7 @@ def analyze_scam_risk(
     else:
         recommended_action = "No immediate threat detected. Maintain standard cyber hygiene practices."
 
-    # 7. Summary & Backward Compatibility
+    # 8. Summary & Backward Compatibility
     summary = f"{risk_level.upper()} RISK (Score: {final_score}/100): "
     if reasons:
         summary += f"Detected signals: {', '.join(reasons[:2])}."
@@ -377,8 +537,8 @@ def analyze_scam_risk(
         reasons=reasons,
         recommended_action=recommended_action,
         indicators=indicators,
-        model_version=model_version,
-        analysis_mode=analysis_mode,
+        model_version=effective_model_version,
+        analysis_mode=effective_analysis_mode,
         summary=summary,
         breakdown=breakdown,
         recommendations=[recommended_action],
@@ -401,5 +561,11 @@ def analyze_scam_risk(
         concise_explanation=distil_pred.explanation,
         distilbert=distil_pred.model_dump(),
         # Dedicated Email Header Security Analysis
-        header_analysis=header_res
+        header_analysis=header_res,
+        # Gemini AI Threat Intelligence
+        gemini_analysis=gemini_result,
+        # UPI Deep Link & QR Code Audit
+        upi_audit=upi_audit,
+        # Malicious APK Dropper Audit
+        apk_audit=apk_audit
     )

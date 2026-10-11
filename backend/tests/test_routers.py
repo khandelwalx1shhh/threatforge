@@ -37,6 +37,8 @@ def test_extract_endpoint_placeholder():
     assert "count" in data
 
 def test_threats_endpoint_placeholder():
+    from app.main import seed_initial_demo_data
+    seed_initial_demo_data()
     response = client.get("/api/threats")
     assert response.status_code == 200
     data = response.json()

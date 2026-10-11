@@ -40,7 +40,10 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-icon">T</span><span>Threat<span className="accent">Forge</span></span></div>
+        <div className="brand">
+          <img src="/logo_transparent.png" alt="Argus Logo" className="brand-logo-img" />
+          <span>Arg<span className="accent">us</span></span>
+        </div>
         <div className="side-label">WORKSPACE</div>
         <a 
           className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`} 
@@ -56,13 +59,18 @@ function App() {
         >
           ⌁ <span>Analyze Content</span>
         </a>
-        <div className="sidebar-bottom"><span className="live-dot" /> Systems operational <small>THREATFORGE MVP</small></div>
+        <div className="sidebar-bottom"><span className="live-dot" /> Systems operational <small>ARGUS SOC</small></div>
       </aside>
 
       <main className="main-content">
         <header className="topbar">
           <div className="breadcrumb">Workspace <span>/</span> {activeTab === 'overview' ? 'Overview' : 'Analyze'}</div>
-          <div className="top-right"><span className="status-pill"><i /> Demo environment</span><div className="avatar">TF</div></div>
+          <div className="top-right">
+            <span className="status-pill"><i /> Active Shield</span>
+            <div className="avatar" style={{ padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/logo_transparent.png" alt="Argus" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+            </div>
+          </div>
         </header>
 
         {activeTab === 'overview' ? (
@@ -136,7 +144,7 @@ function App() {
             <AnalyzePage />
           </div>
         )}
-        <footer className="footer"><span>ThreatForge <span className="accent">●</span> Threat intelligence platform</span><span>Hackathon MVP · Demo data only</span></footer>
+        <footer className="footer"><span>Argus <span className="accent">●</span> Autonomous Cyber Defense Platform</span><span>Production Grade · Zero Leakage</span></footer>
       </main>
     </div>
   )

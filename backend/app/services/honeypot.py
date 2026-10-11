@@ -98,9 +98,14 @@ def run_honeypot_chat_turn(
     )
     db.add(scammer_msg)
 
-    # Generate honeypot persona response
-    options = PERSONA_RESPONSES.get(clean_persona, PERSONA_RESPONSES["victim"])
-    reply = options[(session.turn_count - 1) % len(options)]
+    # Generate honeypot persona response (AI generated via Gemini if key present, else local deterministic template)
+    from app.services.gemini_detector import gemini_detector
+    ai_reply = gemini_detector.generate_honeypot_reply(message, clean_persona, session.turn_count) if gemini_detector.is_available else None
+    if ai_reply:
+        reply = ai_reply
+    else:
+        options = PERSONA_RESPONSES.get(clean_persona, PERSONA_RESPONSES["victim"])
+        reply = options[(session.turn_count - 1) % len(options)]
 
     # Save Agent response
     agent_msg = HoneypotMessage(

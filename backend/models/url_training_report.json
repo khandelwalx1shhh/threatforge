@@ -1,0 +1,110 @@
+{
+  "model_version": "url-v1",
+  "dataset_source": "urls_normalized.csv",
+  "raw_samples": 60000,
+  "deduplicated_samples": 60000,
+  "balanced_training_total": 60000,
+  "class_distribution": {
+    "benign_0": 30000,
+    "malicious_1": 30000
+  },
+  "train_set_size": 48000,
+  "test_set_size": 12000,
+  "metrics": {
+    "accuracy": 0.7508,
+    "precision": 0.7982,
+    "recall": 0.6712,
+    "f1_score": 0.7292,
+    "confusion_matrix": {
+      "true_negative": 4982,
+      "false_positive": 1018,
+      "false_negative": 1973,
+      "true_positive": 4027
+    }
+  },
+  "classification_report": {
+    "benign": {
+      "precision": 0.7163191948238677,
+      "recall": 0.8303333333333334,
+      "f1-score": 0.7691238903898109,
+      "support": 6000.0
+    },
+    "malicious": {
+      "precision": 0.7982160555004956,
+      "recall": 0.6711666666666667,
+      "f1-score": 0.7291987324581258,
+      "support": 6000.0
+    },
+    "accuracy": 0.75075,
+    "macro avg": {
+      "precision": 0.7572676251621817,
+      "recall": 0.75075,
+      "f1-score": 0.7491613114239684,
+      "support": 12000.0
+    },
+    "weighted avg": {
+      "precision": 0.7572676251621816,
+      "recall": 0.75075,
+      "f1-score": 0.7491613114239684,
+      "support": 12000.0
+    }
+  },
+  "feature_names": [
+    "url_length",
+    "host_length",
+    "path_length",
+    "query_length",
+    "num_dots",
+    "num_subdomains",
+    "num_hyphens",
+    "num_slashes",
+    "num_at",
+    "num_question",
+    "num_equal",
+    "num_ampersand",
+    "num_percent",
+    "num_digits",
+    "digit_ratio",
+    "special_char_count",
+    "special_char_ratio",
+    "is_ip_host",
+    "has_punycode",
+    "entropy",
+    "host_entropy",
+    "suspicious_keyword_count",
+    "brand_spoofing_count",
+    "suspicious_tld",
+    "double_slash_in_path",
+    "at_symbol",
+    "is_https"
+  ],
+  "coefficients": {
+    "url_length": 0.4781,
+    "host_length": 0.3601,
+    "path_length": -0.5314,
+    "query_length": 0.4888,
+    "num_dots": 1.1245,
+    "num_subdomains": -0.9828,
+    "num_hyphens": -0.3129,
+    "num_slashes": 0.5135,
+    "num_at": 0.0699,
+    "num_question": 0.0079,
+    "num_equal": 0.1064,
+    "num_ampersand": -0.06,
+    "num_percent": 0.0279,
+    "num_digits": 0.6268,
+    "digit_ratio": 0.1989,
+    "special_char_count": 0.1373,
+    "special_char_ratio": -0.8675,
+    "is_ip_host": 0.6399,
+    "has_punycode": 0.1855,
+    "entropy": -0.1804,
+    "host_entropy": 0.1957,
+    "suspicious_keyword_count": 2.1764,
+    "brand_spoofing_count": 0.4976,
+    "suspicious_tld": 0.8386,
+    "double_slash_in_path": 0.2338,
+    "at_symbol": 0.202,
+    "is_https": 0.0436
+  }
+}

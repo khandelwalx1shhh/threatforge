@@ -79,6 +79,33 @@ export interface EmailHeaderAnalysis {
   summary: string;
 }
 
+export interface UpiAuditResult {
+  is_upi_deeplink: boolean;
+  raw_uri?: string | null;
+  payee_vpa?: string | null;
+  payee_name?: string | null;
+  amount?: number | null;
+  currency?: string;
+  transaction_note?: string | null;
+  is_reverse_charge_lure: boolean;
+  is_brand_spoofing: boolean;
+  risk_boost: number;
+  anomalies: string[];
+  warning_message?: string | null;
+}
+
+export interface ApkAuditResult {
+  has_apk_dropper: boolean;
+  filename?: string | null;
+  download_url?: string | null;
+  lure_category?: string | null;
+  targeted_threat_family?: string | null;
+  risk_score: number;
+  is_critical_threat: boolean;
+  reasons: string[];
+  defensive_warning?: string | null;
+}
+
 export interface AnalysisResult {
   risk_score: number;
   risk_level: SeverityEnum;
@@ -104,6 +131,9 @@ export interface AnalysisResult {
   concise_explanation?: string | null;
   distilbert?: DistilBertResult | null;
   header_analysis?: EmailHeaderAnalysis | null;
+  gemini_analysis?: Record<string, any> | null;
+  upi_audit?: UpiAuditResult | null;
+  apk_audit?: ApkAuditResult | null;
 }
 
 export interface ChatRequest {

@@ -239,6 +239,171 @@ export function AnalysisResultsPanel({ result, onEdit }: AnalysisResultsPanelPro
         </div>
       )}
 
+      {/* Google Gemini AI Threat Intelligence Analysis */}
+      {result.gemini_analysis && (
+        <div className={styles.section}>
+          <h4>Google Gemini GenAI Threat Reasoning</h4>
+          <div className={styles.transformerCard}>
+            <div className={styles.modelHeader}>
+              <span className={styles.modelTag}>
+                ✨ {result.gemini_analysis.engine || "Google Gemini"} ({result.gemini_analysis.model || "gemini-1.5-flash"})
+              </span>
+              <span className={styles.verifiedBadge}>
+                INTENT: {result.gemini_analysis.intent_category || "Flagged Threat"}
+              </span>
+            </div>
+
+            <div className={styles.modelStatsGrid}>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>AI Risk Assessment</span>
+                <span className={styles.statValue}>
+                  {result.gemini_analysis.risk_score} / 100 ({result.gemini_analysis.risk_level?.toUpperCase()})
+                </span>
+              </div>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>AI Confidence</span>
+                <span className={styles.statValue}>
+                  {result.gemini_analysis.confidence
+                    ? `${(result.gemini_analysis.confidence * 100).toFixed(1)}%`
+                    : "95.0%"}
+                </span>
+              </div>
+            </div>
+
+            {result.gemini_analysis.psychological_tactics && result.gemini_analysis.psychological_tactics.length > 0 && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <span className={styles.statLabel}>Psychological &amp; Social Engineering Tactics:</span>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                  {result.gemini_analysis.psychological_tactics.map((tactic: string, idx: number) => (
+                    <span key={idx} className={styles.authPill} style={{ background: '#f59e0b22', color: '#f59e0b', border: '1px solid #f59e0b55' }}>
+                      ⚡ {tactic}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {result.gemini_analysis.summary && (
+              <p className={styles.factorDesc} style={{ marginTop: '0.75rem', fontWeight: 500 }}>
+                {result.gemini_analysis.summary}
+              </p>
+            )}
+
+            {result.gemini_analysis.recommended_action && (
+              <div className={styles.warningBox} style={{ marginTop: '0.5rem', background: '#3b82f615', borderColor: '#3b82f640', color: '#60a5fa' }}>
+                🛡️ <strong>AI Safety Recommendation:</strong> {result.gemini_analysis.recommended_action}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Malicious Sideloaded APK Package Dropper Audit */}
+      {result.apk_audit && result.apk_audit.has_apk_dropper && (
+        <div className={styles.section}>
+          <h4>📦 Sideloaded Android APK Package Inspection</h4>
+          <div className={styles.transformerCard} style={{ borderColor: '#ef444466' }}>
+            <div className={styles.modelHeader}>
+              <span className={styles.modelTag} style={{ background: '#ef444422', color: '#ef4444', borderColor: '#ef444455' }}>
+                🚨 MALWARE DROPPER ({result.apk_audit.filename})
+              </span>
+              <span className={styles.verifiedBadge} style={{ background: '#ef444433', color: '#fca5a5' }}>
+                {result.apk_audit.lure_category}
+              </span>
+            </div>
+
+            <div className={styles.modelStatsGrid}>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>Malware Taxonomy</span>
+                <span className={styles.statValue} style={{ color: '#ef4444' }}>
+                  {result.apk_audit.targeted_threat_family}
+                </span>
+              </div>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>Package Risk Score</span>
+                <span className={styles.statValue} style={{ color: '#ef4444' }}>
+                  {result.apk_audit.risk_score} / 100 (CRITICAL)
+                </span>
+              </div>
+            </div>
+
+            {result.apk_audit.reasons && (
+              <ul style={{ margin: '0.75rem 0 0 1rem', padding: 0, color: '#cbd5e1', fontSize: '0.85rem' }}>
+                {result.apk_audit.reasons.map((r: string, idx: number) => (
+                  <li key={idx} style={{ marginBottom: '0.25rem' }}>{r}</li>
+                ))}
+              </ul>
+            )}
+
+            {result.apk_audit.defensive_warning && (
+              <div className={styles.warningBox} style={{ marginTop: '0.75rem', background: '#dc262622', borderColor: '#dc262666', color: '#fca5a5' }}>
+                ⚠️ <strong>DEFENSIVE ADVISORY:</strong> {result.apk_audit.defensive_warning}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* UPI Deep Link & QR Code Audit */}
+      {result.upi_audit && result.upi_audit.is_upi_deeplink && (
+        <div className={styles.section}>
+          <h4>💳 UPI Deep Link &amp; QR Code Audit</h4>
+          <div className={styles.transformerCard} style={{ borderColor: result.upi_audit.is_reverse_charge_lure ? '#ef444466' : '#f59e0b55' }}>
+            <div className={styles.modelHeader}>
+              <span className={styles.modelTag} style={{ background: '#3b82f622', color: '#60a5fa', borderColor: '#3b82f655' }}>
+                ⚡ UPI Payment Intent ({result.upi_audit.currency || 'INR'})
+              </span>
+              {result.upi_audit.is_reverse_charge_lure && (
+                <span className={styles.verifiedBadge} style={{ background: '#ef444433', color: '#fca5a5' }}>
+                  🚨 REVERSE-CHARGE FRAUD
+                </span>
+              )}
+            </div>
+
+            <div className={styles.modelStatsGrid}>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>Payee VPA Handle</span>
+                <span className={styles.statValue} style={{ wordBreak: 'break-all' }}>
+                  {result.upi_audit.payee_vpa || "Unspecified VPA"}
+                </span>
+              </div>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>Declared Payee Name</span>
+                <span className={styles.statValue}>
+                  {result.upi_audit.payee_name || "Anonymous Payee"}
+                </span>
+              </div>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>Pre-filled Debit Amount</span>
+                <span className={styles.statValue}>
+                  {result.upi_audit.amount !== null && result.upi_audit.amount !== undefined ? `₹${result.upi_audit.amount}` : "User specified"}
+                </span>
+              </div>
+              <div className={styles.statBox}>
+                <span className={styles.statLabel}>Transaction Note</span>
+                <span className={styles.statValue}>
+                  {result.upi_audit.transaction_note || "None"}
+                </span>
+              </div>
+            </div>
+
+            {result.upi_audit.anomalies && result.upi_audit.anomalies.length > 0 && (
+              <ul style={{ margin: '0.75rem 0 0 1rem', padding: 0, color: '#fcd34d', fontSize: '0.85rem' }}>
+                {result.upi_audit.anomalies.map((a: string, idx: number) => (
+                  <li key={idx} style={{ marginBottom: '0.25rem' }}>⚠️ {a}</li>
+                ))}
+              </ul>
+            )}
+
+            {result.upi_audit.warning_message && (
+              <div className={styles.warningBox} style={{ marginTop: '0.75rem', background: '#f59e0b22', borderColor: '#f59e0b66', color: '#fde047' }}>
+                🛡️ <strong>UPI Fraud Advisory:</strong> {result.upi_audit.warning_message}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {result.breakdown && result.breakdown.length > 0 && (
         <div className={styles.section}>
           <h4>Risk Factors</h4>

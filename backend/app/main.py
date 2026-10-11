@@ -81,11 +81,23 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Development CORS configured strictly for local development origins
+DEVELOPMENT_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://10.21.96.95:5173",
+    "http://10.21.96.95:8000"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=DEVELOPMENT_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -142,9 +154,15 @@ app.include_router(dashboard.router)
 def health_check():
     from app.services.model_manager import model_manager
     from app.services.distilbert_detector import distilbert_detector
+    from app.services.url_analyzer import url_classifier_service
+    from app.services.gemini_detector import gemini_detector
     return {
         "status": "ok",
         "model_loaded": model_manager.is_loaded,
+        "url_model_loaded": url_classifier_service.is_available(),
+        "url_model_version": url_classifier_service.model_version,
         "distilbert_loaded": distilbert_detector.is_loaded,
-        "distilbert_quantized": distilbert_detector.is_quantized
+        "distilbert_quantized": distilbert_detector.is_quantized,
+        "gemini_configured": gemini_detector.is_available,
+        "gemini_model": getattr(settings, "GEMINI_MODEL", "gemini-1.5-flash")
     }

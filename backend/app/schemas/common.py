@@ -15,6 +15,8 @@ class IndicatorTypeEnum(str, Enum):
     PHONE = "Suspicious Phone"
     EMAIL = "Email Address"
     UPI = "UPI ID"
+    UPI_DEEPLINK = "UPI Deep Link"
+    APK = "Malicious APK"
     BANK = "Bank Account"
     SOCIAL = "Social Engineering"
     OTHER = "Other Indicator"

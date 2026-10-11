@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Argus</string>
+    <string name="notification_listener_service_name">Argus Real-Time Defense</string>
+    <string name="notification_access_title">Notification Access Required</string>
+    <string name="notification_access_desc">Argus screens scam notifications directly on your device. Only WhatsApp, Telegram, and SMS notifications are inspected locally to alert you of phishing threats. No personal messages are uploaded without explicit permission.</string>
+    <string name="enable_access_button">Open Notification Access Settings</string>
+    <string name="synthetic_test_banner">Synthetic Test Pipeline</string>
+    <string name="status_listening">Live Monitoring: Active</string>
+    <string name="status_disconnected">Live Monitoring: Inactive / Permission Missing</string>
+</resources>

@@ -90,6 +90,23 @@ h1, h2, h3, p { margin: 0; }
   transition: var(--transition);
 }
 
+.brand-logo-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 9px;
+  background: rgba(11, 15, 25, 0.95);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+  padding: 4px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.brand:hover .brand-logo-img {
+  transform: scale(1.08);
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.6);
+}
+
 .brand:hover .brand-icon {
   transform: scale(1.05);
   box-shadow: 0 0 40px var(--accent-glow);

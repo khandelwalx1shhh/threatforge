@@ -55,3 +55,17 @@ data/
 hf_cache/
 *.safetensors
 *.bin
+
+# Android & Gradle
+.gradle/
+android/.gradle/
+**/build/
+local.properties
+android/local.properties
+*.apk
+*.aab
+
+# Node & Frontend
+node_modules/
+dist/
+.vite/
