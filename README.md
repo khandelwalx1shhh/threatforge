@@ -6,6 +6,8 @@
 
 Built for hackathons and production prototypes with a FastAPI backend, Scikit-Learn & PyTorch ML classifiers, INT8 Quantized DistilBERT Transformer, native Android on-device real-time fraud defense agent, and a React + TypeScript SOC dashboard.
 
+> 📘 **Full Architecture & Technical Dossier**: For in-depth engineering specifications, on-device detection pipelines, and API contracts, see [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md).
+
 ---
 
 ## Phase 2 Architecture & Status Summary
