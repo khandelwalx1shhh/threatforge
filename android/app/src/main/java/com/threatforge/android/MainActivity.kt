@@ -313,7 +313,8 @@ fun ThreatForgeApp() {
                     onOpenSettings = {
                         openNotificationSettings(context)
                         isPermissionGranted = isNotificationAccessGranted(context)
-                    }
+                    },
+                    onDismissStatus = { pipeline.clearStatusMessage() }
                 )
                 1 -> ScannerTab(
                     isLoading = isLoading,
@@ -433,7 +434,8 @@ fun ShieldTab(
     cloudEnabled: Boolean,
     userConsentGranted: Boolean,
     onClear: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onDismissStatus: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -457,7 +459,11 @@ fun ShieldTab(
         // Status banner
         if (isLoading || statusMessage != null) {
             item {
-                AnimatedStatusBanner(isLoading = isLoading, message = statusMessage)
+                AnimatedStatusBanner(
+                    isLoading = isLoading,
+                    message = statusMessage,
+                    onDismiss = onDismissStatus
+                )
             }
         }
 
@@ -744,7 +750,11 @@ fun PulsingDot(color: Color, size: Int = 8) {
 
 // ─── Animated Status Banner ─────────────────────────────────────────────
 @Composable
-fun AnimatedStatusBanner(isLoading: Boolean, message: String?) {
+fun AnimatedStatusBanner(
+    isLoading: Boolean,
+    message: String?,
+    onDismiss: () -> Unit = {}
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -758,7 +768,7 @@ fun AnimatedStatusBanner(isLoading: Boolean, message: String?) {
                     if (isLoading) TFColors.AccentBlue.copy(alpha = 0.2f) else TFColors.AccentAmber.copy(alpha = 0.2f),
                     RoundedCornerShape(12.dp)
                 )
-                .padding(12.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isLoading) {
@@ -781,8 +791,22 @@ fun AnimatedStatusBanner(isLoading: Boolean, message: String?) {
                 text = message ?: "Analyzing threat...",
                 fontSize = 12.sp,
                 color = if (isLoading) TFColors.AccentBlue else TFColors.AccentAmber,
-                lineHeight = 16.sp
+                lineHeight = 16.sp,
+                modifier = Modifier.weight(1f)
             )
+            if (!isLoading) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Dismiss",
+                        tint = TFColors.TextMuted,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
         }
     }
 }

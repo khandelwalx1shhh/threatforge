@@ -65,6 +65,10 @@ class DetectionPipeline(
         storageManager?.setBaseUrl(url)
     }
 
+    fun clearStatusMessage() {
+        _statusMessage.value = null
+    }
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 

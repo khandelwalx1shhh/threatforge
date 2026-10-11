@@ -27,15 +27,18 @@ class EventDeduplicator(private val maxEntries: Int = 100) {
     }
 
     /**
-     * Checks if the event has been seen recently. If not seen, records it and returns false.
-     * If seen, returns true (is duplicate).
+     * Checks if the event has been seen recently within the duplicate suppression window (default 4000ms).
+     * If seen within the window, returns true (is rapid OS duplicate).
+     * If not seen recently, records the timestamp and returns false (valid event to process).
      */
-    fun isDuplicateAndRecord(eventKey: String): Boolean {
+    fun isDuplicateAndRecord(eventKey: String, windowMs: Long = 4000L): Boolean {
         synchronized(lock) {
-            if (seenEventKeys.containsKey(eventKey)) {
+            val now = System.currentTimeMillis()
+            val lastSeen = seenEventKeys[eventKey]
+            if (lastSeen != null && (now - lastSeen) < windowMs) {
                 return true
             }
-            seenEventKeys[eventKey] = System.currentTimeMillis()
+            seenEventKeys[eventKey] = now
             return false
         }
     }
